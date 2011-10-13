@@ -172,3 +172,8 @@ for rec in record_iter:
     
 
 print "\nRun finished " + strftime("%Y-%m-%d %H:%M:%S") + ".\n"
+print "Run the following command to train RDP classifier for your database:"
+print "java -Xmx1g -cp rdp_classifier-2.3.jar \
+edu/msu/cme/rdp/classifier/train/ClassifierTraineeMaker" \
++ tax_out + fasta_out + " 1 v1 test" + \
+str(os.path.dirname(os.path.abspath(fasta_out)))
