@@ -1,0 +1,6 @@
+-itestdata.fastq
+-otestdata.qc.fastq
+-Ofastq
+-l80
+-B10000
+-v

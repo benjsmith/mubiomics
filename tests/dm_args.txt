@@ -1,0 +1,9 @@
+-itestdata.qc.fastq
+-otestout.fasta
+-mtestmap.txt
+-e1
+-T3
+-R4
+-S
+-B10000
+-v
