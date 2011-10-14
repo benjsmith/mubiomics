@@ -12,11 +12,9 @@ from time import strftime
 sys.path.insert(0,os.path.dirname(os.path.dirname(sys.argv[0])))
 from MPSDemultiplexer.demultiplex import *
 
-
 parser = argparse.ArgumentParser(
-    description='''Takes a demultiplexed next-gen sequencing fasta file for one
-    direction in a paired-end run and demultiplexes the other direction's
-    sequence file by matching the original read names.''',
+    description='''A set of python tools for characterizing the microbiome
+    from next-generation sequencing reads.''',
     fromfile_prefix_chars='@')
 parser.add_argument('-i','--infile', required=True, nargs=1,
                     type=str, help='''input filepath. Should be a FASTA format
@@ -64,7 +62,7 @@ parser.add_argument('-f', '--left_trim', nargs=1, default=[None], type=int,
 parser.add_argument('-L', '--max_length', nargs=1, default=[None], type=int,
                     help='''set the sequence length that should be returned
                     (i.e., after any trimminmg that is specified).''')
-parser.add_argument('-u', '--use_indexdb', action='store_true',
+parser.add_argument('-d', '--use_indexdb', action='store_true',
                     help='''activate database indexing mode. This should be
                     used if the mate file is larger than the available RAM. It
                     indexes the entries in the mate file and temporarily
@@ -113,95 +111,3 @@ if use_indexdb:
     matedata = SeqIO.index_db(indexfile, matefile, matefmt)
 else:
     matedata = SeqIO.index_db(matefile, matefmt)
-
-print "Finding mates..."
-mated_ctr = 0
-for i, rec in enumerate(indata):
-    if verbose :#print line number to stdout
-        sys.stdout.write("Processing read: " + str(i+1))
-        sys.stdout.flush()
-        sys.stdout.write("\b"*len("Processing read: " + str(i+1)))
-    #get original read name and direction identifier which should be the second
-    #part of the post-demultiplexing id.
-    split_id = rec.description.split()
-    orig_id, ending = split_id[1].split("/")
-    #depending on the direction identifier ("ending") of the demultiplexed read,
-    #construct the full original read name of the mate
-    if int(ending) == dir_ids[0]:
-        mate_orig_id = '/'.join([orig_id, str(dir_ids[1])])
-    elif int(ending) == dir_ids[1]:
-        mate_orig_id = '/'.join([orig_id, str(dir_ids[0])])
-    else:
-        print "Read direction identifier doesn't match any that were entered"
-        sys.exit(1)
-    #look for the original mate id in the matedata keys and then set it as new
-    #sequence to be written, incorporating the appropriate modifications to its
-    #length and header.
-    try:
-        new_rec = matedata[mate_orig_id]
-        #if mapping file specified containing primers to trim:
-        if mapfile:
-            for query in trimlist:
-                try :
-                    spos, epos = ambiguous_search(new_rec.seq, query, max_mismatch)
-                    if max_length:
-                        max_trim_pos = epos+max_length
-                    else:
-                        max_trim_pos = None
-                    new_rec = new_rec[epos:max_trim_pos]
-                    break
-                except TypeError:
-                    pass        
-        #if no mapping file, set the trimming based on the "trim"
-        #and "max_length" parameters, if present.
-        else:
-            if max_length:
-                if trim:    
-                    max_trim_pos = trim+max_length
-                else:
-                    max_trim_pos = max_length
-            else:
-                max_trim_pos = None
-            new_rec = new_rec[trim:max_trim_pos]
-        #create new headers for mate sequences from demultiplexed names and then
-        #write to output file
-        new_rec.id = "%s" % split_id[0]
-        new_rec.description = mate_orig_id
-        SeqIO.write(new_rec, outhandle, outfmt)
-        mated_ctr += 1
-    except KeyError:
-        pass
-total_reads = i+1
-orphans = i+1-mated_ctr
-
-
-# Write log
-logpath = open(str(os.path.splitext(outfile)[0]) + ".log","wb")
-logpath.write("Logfile for mate-finding of " \
-+ infile + "and" + matefile + "\n" + strftime("%Y-%m-%d %H:%M:%S") + "\n\n" \
-"Parameters specified:\n" \
-"Mapping file: " + str(mapfile) + "\n" \
-"Maximum mismatches with sequences to be trimmed: " + str(max_mismatch) + "\n" \
-"Nucleotides to trim from left: " + str(trim) + "\n" \
-"Maximum length: " + str(max_length) + "\n\n" \
-"Counts:"
-"\nTotal reads parsed: " + str(total_reads) + "\n" \
-"Reads mated: " + str(mated_ctr) + "\n" \
-"Orphan reads:" + str(orphans) + "\n")
-logpath.close()
-
-print "\n\nLog file written (" + str(os.path.splitext(outfile)[0]) + ".log" + ")\n"
-    
-#inhandle.close()
-#matehandle.close()
-if use_indexdb:
-    os.remove(indexfile)
-try:
-    maphandle.close()
-except NameError:
-    pass    
-outhandle.close()
-logpath.close()
-    
-print "Run finished " + strftime("%Y-%m-%d %H:%M:%S") + "."
-
