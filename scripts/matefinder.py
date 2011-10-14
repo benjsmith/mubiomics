@@ -101,7 +101,8 @@ except IOError:
     outhandle = open(outfile, "wb")
     
 print "Indexing mate sequences..."
-matedata = SeqIO.index(matefile, matefmt)
+indexfile = str(os.path.splitext(os.path.abspath(matefile))[0]) + ".idx"
+matedata = SeqIO.index_db(indexfile, matefile, matefmt)
 
 print "Finding mates..."
 mated_ctr = 0
@@ -183,6 +184,7 @@ print "\n\nLog file written (" + str(os.path.splitext(outfile)[0]) + ".log" + ")
     
 #inhandle.close()
 #matehandle.close()
+os.remove(indexfile)
 try:
     maphandle.close()
 except NameError:
