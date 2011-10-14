@@ -64,6 +64,11 @@ parser.add_argument('-f', '--left_trim', nargs=1, default=[None], type=int,
 parser.add_argument('-L', '--max_length', nargs=1, default=[None], type=int,
                     help='''set the sequence length that should be returned
                     (i.e., after any trimminmg that is specified).''')
+parser.add_argument('-d', '--use_indexdb', action='store_true',
+                    help='''activate database indexing mode. This should be
+                    used if the mate file is larger than the available RAM. It
+                    indexes the entries in the mate file and temporarily
+                    stores them in an SQL database file.''')
 parser.add_argument('-v', '--verbose', action='store_true',
                     help='''activate verbose mode to indicate progress.''')
 #set parameters from supplied arguments
@@ -79,6 +84,7 @@ mapfile = args.map_fp[0]
 max_mismatch = args.max_mismatch[0]
 trim = args.left_trim[0]
 max_length = args.max_length[0]
+use_indexdb = args.use_indexdb
 verbose = args.verbose
 
 #open file handles
@@ -101,8 +107,12 @@ except IOError:
     outhandle = open(outfile, "wb")
     
 print "Indexing mate sequences..."
-indexfile = str(os.path.splitext(os.path.abspath(matefile))[0]) + ".idx"
-matedata = SeqIO.index_db(indexfile, matefile, matefmt)
+
+if use_indexdb:
+    indexfile = str(os.path.splitext(os.path.abspath(matefile))[0]) + ".idx"
+    matedata = SeqIO.index_db(indexfile, matefile, matefmt)
+else:
+    matedata = SeqIO.index_db(matefile, matefmt)
 
 print "Finding mates..."
 mated_ctr = 0
@@ -184,7 +194,8 @@ print "\n\nLog file written (" + str(os.path.splitext(outfile)[0]) + ".log" + ")
     
 #inhandle.close()
 #matehandle.close()
-os.remove(indexfile)
+if use_indexdb:
+    os.remove(indexfile)
 try:
     maphandle.close()
 except NameError:
