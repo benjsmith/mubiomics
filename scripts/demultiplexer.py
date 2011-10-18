@@ -17,7 +17,7 @@ sys.path.insert(0,os.path.dirname(os.path.dirname(sys.argv[0])))
 from MPSDemultiplexer.demultiplex import *
 from MPSDemultiplexer.patricia import *
 from MPSDemultiplexer.hamming import *
-from Levenshtein import distance
+
 
 
 # Fetch command-line arguments
@@ -199,7 +199,7 @@ for record in record_iter :
         new_seq_r = record[result[0]:max_trim_pos]
         new_seq_r.description = "%s orig_bc=%s new_bc=%s bc_diffs=%i" \
                         % (new_seq_r.name, result[2], result[3], \
-                        distance(result[2], result[3]))                    
+                        ambiguous_seq_dist(result[2], result[3]))                    
         id_counts[bcs[result[3]],1] += 1
         count_a += 1
         primer_mismatches.append(float(result[4]))
@@ -217,7 +217,7 @@ for record in record_iter :
 #if uncommented, names unassigned in same manner as assigned, otherwise gives original name
 #        new_seq_r.description = "%s orig_bc=%s new_bc=%s bc_diffs=%i" \
 #                        % (new_seq_r.name, result[2], result[3], \
-#                        distance(result[2], result[3]))                    
+#                        ambiguous_seq_dist(result[2], result[3]))                    
 #        new_seq_r.id = "%s_%i" % (result[1], count_u)
 ##             print new_seq_r.format("fasta").rstrip("\n\b")
         ua_output_buffer.append(new_seq_r)
