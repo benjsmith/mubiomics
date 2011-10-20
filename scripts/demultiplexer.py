@@ -167,14 +167,13 @@ print "\nDemultiplexing run started " + strftime("%Y-%m-%d %H:%M:%S") + "."
 print "Indexing input sequence files..."
 #index sequence input files
 if use_indexdb and not pairfile:
-    indexfile = str(os.path.splitext(os.path.abspath(infile))[0])
-    + "." + dir_ids[0] + ".idx"
+    indexfile = str(os.path.splitext(os.path.abspath(infile))[0]) + ".idx"
     indata = SeqIO.index_db(indexfile, infile, infmt)
 elif use_indexdb and pairfile:
     indexfile = str(os.path.splitext(os.path.abspath(infile))[0]) + ".idx"
-    indata = SeqIO.index_db(indexfile, infile, pairfile, infmt)
+    indata = SeqIO.index_db(indexfile, [infile, pairfile], infmt)
 elif pairfile and not use_indexdb:
-    indata = SeqIO.index(infile, pairfile, infmt)
+    indata = SeqIO.index([infile, pairfile], infmt)
 else:
     indata = SeqIO.index(infile, infmt)
 
