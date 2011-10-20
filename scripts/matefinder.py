@@ -14,24 +14,22 @@ from MPSDemultiplexer.demultiplex import *
 
 
 parser = argparse.ArgumentParser(
-    description='''Takes a demultiplexed next-gen sequencing fasta file for one
-    direction in a paired-end run and demultiplexes the other direction's
-    sequence file by matching the original read names.''',
+    description='''Takes demultiplexed next-gen sequencing fasta files for each
+    direction in a paired-end run along with the unassigned sequnces from the
+    demultiplexing step (total 4 files) and produces 2 files. One file
+    contains all demultiplexed reads containing barcodes, the other contains
+    the now demultiplexed paired reads. The ordering of reads is the same in
+    both files and any reads that didn't have a mate are placed in a third
+    file (<infile prefix>.unmated.fasta).''',
     fromfile_prefix_chars='@')
-parser.add_argument('-i','--infile', required=True, nargs=1,
-                    type=str, help='''input filepath. Should be a FASTA format
-                    file. Usually will be the file of unassigned sequences
-                    produced by the demultiplexer.''')
+parser.add_argument('-i','--infiles', required=True, nargs=1,
+                    type=str, help='''input files. Should be FASTA format
+                    demultiplexed files files.''')
 parser.add_argument('-I', '--in_fmt', required=True, nargs=1, type=str,
                     help='''input file format (fasta or fastq)''')
-parser.add_argument('-t','--matefile', required=True, nargs=1,
-                    type=str, help='''filepath of mate file to be demultiplexed.
-                    Should be a FASTA or FASTQ format file. The mates of all
-                    in the input file must be in here and in the same order,
-                    though they do not neccessarily have to appear
-                    sequentially in the mate file. This will be the default
-                    situation if you have used the demultiplexer in this
-                    package.''')
+parser.add_argument('-t','--matefiles', required=True, nargs=1,
+                    type=str, help='''filepath of mate files to be demultiplexed.
+                    Should be FASTA or FASTQ format files..''')
 parser.add_argument('-T', '--mate_fmt', required=True, nargs=1, type=str,
                     help='''mate file format (fasta or fastq)''')
 parser.add_argument('-d', '--direction_ids', required=True, nargs=2,
@@ -112,7 +110,7 @@ if use_indexdb:
     indexfile = str(os.path.splitext(os.path.abspath(matefile))[0]) + ".idx"
     matedata = SeqIO.index_db(indexfile, matefile, matefmt)
 else:
-    matedata = SeqIO.index_db(matefile, matefmt)
+    matedata = SeqIO.index(matefile, matefmt)
 
 print "Finding mates..."
 mated_ctr = 0
