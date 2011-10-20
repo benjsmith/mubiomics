@@ -25,13 +25,24 @@ parser = argparse.ArgumentParser(
     description='''Demultiplex barcoded reads from
     next-gen sequencing platforms, trimming primers and barcodes
     and producing FASTA format files containing assigned and unassigned
-    sequences, respectively, and a log file.''',
+    sequences, respectively, and a log file. Optionally can handle paired
+    end reads where the barcode is only on one end. The mate read names
+    with no barcode will be prefixed with the same name as the barcoded
+    read and will appear at the same position in the mated output file.''',
     formatter_class= argparse.ArgumentDefaultsHelpFormatter,
     fromfile_prefix_chars='@')
 parser.add_argument('-i','--input_fp', required=True, nargs=1,
                     type=str, help='''input filepath.''')
 parser.add_argument('-o', '--output_fp', required=True, nargs=1, type=str,
                     help='''output filepath.''')
+parser.add_argument('-p', '--pair_fp', nargs='?', type=str,
+                    help='''(optional) filepath to mate file of a paired-end
+                    sequencing run. If specified, output will consist of an
+                    additional FASTA file, suffixed with ".mates". The
+                    ordering of demultiplexed reads in the two output
+                    sequence files will be the same. All reads that had no
+                    mates will be placed in the FASTA file suffixed with
+                    ".unassigned".''')
 parser.add_argument('-I', '--in_fmt', required=True, nargs=1, type=str,
                     help='''input file format (fasta or fastq)''')
 parser.add_argument('-O', '--out_fmt', required=True, nargs=1, type=str,
@@ -88,6 +99,7 @@ parser.add_argument('-v', '--verbose', action='store_true',
 args = parser.parse_args()
 infile = args.input_fp[0]
 infmt = args.in_fmt[0]
+pairfile = args.pair_fp
 outfmt = args.out_fmt[0]
 outfile = args.output_fp[0]
 
@@ -113,21 +125,27 @@ out_buffer = args.out_buffer[0]
 verbose = args.verbose
 
 
-handle1 = open(infile, "rU") # fastq sequence file
+inhandle = open(infile, "rU") # fastq sequence file
 try :
-    handle2 = open(outfile, "wb")
+    outhandle = open(outfile, "wb")
+    if pairfile:
+        mateouthandle = open(str(os.path.splitext(outfile)[0]) + \
+".mates.fasta", "wb") # mate output fasta file
 except IOError:
     outdir = str(os.path.dirname(os.path.abspath(outfile)))
     os.mkdir(outdir)
-    handle2 = open(outfile, "wb") # output fasta file
-handle3 = open(mapfile, "rU") # mapping file, tsv format
-handle4 = open(str(os.path.splitext(outfile)[0]) + \
+    outhandle = open(outfile, "wb") # output fasta file
+    if pairfile:
+        mateouthandle = open(str(os.path.splitext(outfile)[0]) + \
+".mates.fasta", "wb") # mate output fasta file
+maphandle = open(mapfile, "rU") # mapping file, tsv format
+uahandle = open(str(os.path.splitext(outfile)[0]) + \
 ".unassigned.fasta", "wb") # unassigned output fasta file
 
 
 print "\nDemultiplexing run started " + strftime("%Y-%m-%d %H:%M:%S") + "."
 
-record_iter = SeqIO.parse(handle1, infmt)
+record_iter = SeqIO.parse(inhandle, infmt)
 
 
 bcs = {} #Initialize bcs dictionary. Will have barcode as keyword 
@@ -136,7 +154,7 @@ ids = [] #Initialize list of sample IDs
 primers = [] #Initialize list of primers
 line_ct = -1
 #Extract barcodes, primers and IDs from mapping file
-for line in handle3 :
+for line in maphandle :
     if line[0] != "#" :
         line_ct += 1
         separated = line.split()
@@ -214,21 +232,17 @@ for record in record_iter :
     else:
         count_u += 1
         new_seq_r = record[result[0]:max_trim_pos]
-#if uncommented, names unassigned in same manner as assigned, otherwise gives original name
-#        new_seq_r.description = "%s orig_bc=%s new_bc=%s bc_diffs=%i" \
-#                        % (new_seq_r.name, result[2], result[3], \
-#                        ambiguous_seq_dist(result[2], result[3]))                    
-#        new_seq_r.id = "%s_%i" % (result[1], count_u)
-##             print new_seq_r.format("fasta").rstrip("\n\b")
         ua_output_buffer.append(new_seq_r)
     if result[4]:
         count_pm += 1
+    
+    
     # write all for assigned or unassigned reads if buffer is full.
     if count_u + count_a >= out_buffer :
         # write only longer list
         if len(ua_output_buffer) > len(a_output_buffer):
             for i in ua_output_buffer:
-                SeqIO.write(i, handle4, outfmt)
+                SeqIO.write(i, uahandle, outfmt)
             ua_output_buffer = [] #reset unassigned buffer
         else:
             for i in a_output_buffer:
@@ -242,10 +256,10 @@ for record in record_iter :
         sys.stdout.write("\b"*len("Assigned: " + str(count_a) + ", Unassigned: " + str(count_u)))
 # final buffer clear        
 for i in ua_output_buffer:
-    SeqIO.write(i, handle4, outfmt)
+    SeqIO.write(i, uahandle, outfmt)
 ua_output_buffer = []
 for i in a_output_buffer:
-    SeqIO.write(i, handle2, outfmt)
+    SeqIO.write(i, outhandle, outfmt)
 a_output_buffer = []
 
 if len(primer_mismatches) > 0:
@@ -288,10 +302,10 @@ str(round(sd_err, 4)) + "\n\n" \
 "Sample id.\tCounts\n")
 savetxt(logpath, id_counts, fmt='%s', delimiter='\t')
 
-handle1.close()
-handle2.close()
-handle3.close()
-handle4.close()
+inhandle.close()
+outhandle.close()
+maphandle.close()
+uahandle.close()
 logpath.close()
 
 #If user specified separate output files for each sample (barcode), the

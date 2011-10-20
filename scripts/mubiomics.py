@@ -16,6 +16,7 @@ parser = argparse.ArgumentParser(
     description='''A set of python tools for characterizing the microbiome
     from next-generation sequencing reads.''',
     fromfile_prefix_chars='@')
+subparsers = parser.add_subparsers(help='sub-command help')
 parser.add_argument('-i','--infile', required=True, nargs=1,
                     type=str, help='''input filepath. Should be a FASTA format
                     file. Usually will be the file of unassigned sequences
