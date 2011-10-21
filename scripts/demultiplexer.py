@@ -50,6 +50,8 @@ parser.add_argument('-p', '--pair_fp', nargs='?', type=str,
                     with ".singletons". All reads that could not be identified
                     to a sample name will be written to the FASTA dile suffixed
                     with ".unassigned".''')
+parser.add_argument('-P', '--paired', action='store_true',
+                    help='''activate paired-end mode.''')
 parser.add_argument('-d', '--direction_ids', required=True, nargs='+',
                     type=int, help='''numbers in read names identifying
                     direction of read. Thi is the last number after the
@@ -104,6 +106,13 @@ parser.add_argument('-u', '--use_indexdb', action='store_true',
                     used if the mate file is larger than the available RAM. It
                     indexes the entries in the mate file and temporarily
                     stores them in an SQL database file.''')
+parser.add_argument('-x', '--index_exists', action='store_true',
+                    help='''activate this if sequences have already been indexed
+                    and stored in an SQL database file by this script using
+                    index_db, or by another script using Biopython's
+                    SeqIO.index_db(...). If this is activated, make your input
+                    file (-i/--input_fp) the path to the database file, there
+                    is no need to activate -u/--use_indexdb in this case.''')
 parser.add_argument('-v', '--verbose', action='store_true',
                     help='''activate verbose mode. Indicates progress and other
                     information.''')
@@ -112,6 +121,7 @@ args = parser.parse_args()
 infile = args.input_fp[0]
 infmt = args.in_fmt[0]
 pairfile = args.pair_fp
+paired = args.paired
 dir_ids = args.direction_ids
 outfmt = args.out_fmt[0]
 outfile = args.output_fp[0]
@@ -135,15 +145,19 @@ max_prim_mismatch = args.max_primer_mismatch[0]
 max_bc_st_pos = args.max_bc_start_pos[0]
 right_padding = args.right_pad[0]
 use_indexdb = args.use_indexdb
+idx_exists = args.index_exists
 verbose = args.verbose
 
 #open required filehandles dependent on parameters specified
-inhandle = open(infile, "rU") #input file
-if pairfile:
-    pairhandle = open(pairfile, "rU") #optional input pair file
+#input file
+if not idx_exists:
+    inhandle = open(infile, "rU")
+    if paired:
+        pairhandle = open(pairfile, "rU") #optional input pair file
+
 try :
     outhandle = open(outfile, "wb")
-    if pairfile:
+    if paired:
         mateouthandle = open(str(os.path.splitext(outfile)[0]) + \
 ".mates.fasta", "wb") # mate output fasta file
         singouthandle = open(str(os.path.splitext(outfile)[0]) + \
@@ -152,7 +166,7 @@ except IOError:
     outdir = str(os.path.dirname(os.path.abspath(outfile)))
     os.mkdir(outdir)
     outhandle = open(outfile, "wb") # output fasta file
-    if pairfile:
+    if paired:
         mateouthandle = open(str(os.path.splitext(outfile)[0]) + \
 ".mates.fasta", "wb") # mate output fasta file
         singouthandle = open(str(os.path.splitext(outfile)[0]) + \
@@ -164,19 +178,21 @@ uahandle = open(str(os.path.splitext(outfile)[0]) + \
 
 print "\nDemultiplexing run started " + strftime("%Y-%m-%d %H:%M:%S") + "."
 
-print "Indexing input sequence files..."
-#index sequence input files
-if use_indexdb and not pairfile:
-    indexfile = str(os.path.splitext(os.path.abspath(infile))[0]) + ".idx"
-    indata = SeqIO.index_db(indexfile, infile, infmt)
-elif use_indexdb and pairfile:
-    indexfile = str(os.path.splitext(os.path.abspath(infile))[0]) + ".idx"
-    indata = SeqIO.index_db(indexfile, [infile, pairfile], infmt)
-elif pairfile and not use_indexdb:
-    indata = SeqIO.index([infile, pairfile], infmt)
+if not idx_exists:
+    print "Indexing input sequence files..."
+    #index sequence input files
+    if use_indexdb and not paired:
+        indexfile = str(os.path.splitext(os.path.abspath(infile))[0]) + ".idx"
+        indata = SeqIO.index_db(indexfile, infile, infmt)
+    elif use_indexdb and paired:
+        indexfile = str(os.path.splitext(os.path.abspath(infile))[0]) + ".idx"
+        indata = SeqIO.index_db(indexfile, [infile, pairfile], infmt)
+    elif paired and not use_indexdb:
+        indata = SeqIO.index([infile, pairfile], infmt)
+    else:
+        indata = SeqIO.index(infile, infmt)
 else:
-    indata = SeqIO.index(infile, infmt)
-
+    indata = SeqIO.index_db(infile)
 
 bcs = {} #Initialize bcs dictionary. Will have barcode as keyword 
 #and position in list as value
@@ -195,7 +211,7 @@ for line in maphandle :
             primers.append(separated[2])
         except IndexError:
             pass
-        if pairfile:
+        if paired:
             #test for presence of data in this column
             try:
                 #test that data is an ambiguous DNA sequence
@@ -263,7 +279,7 @@ for recname in readnames :
         #if single-end, will definitely match a record in indata
         #if paired-end, the selected record may have the other dir_id
         record = indata["/".join([recname, dir_ids[0]])]
-        if pairfile:
+        if paired:
             try:
                 materecord = indata["/".join([recname, dir_ids[1]])]
             except KeyError:
@@ -295,7 +311,7 @@ for recname in readnames :
                             ambiguous_seq_dist(result[2], result[3]))                    
             id_counts[bcs[result[3]],1] += 1
             fwdseq.id = "%s_%i" % (result[1], count_a)
-            if not pairfile:
+            if not paired:
                 #write to outhandle if a
                 #perfroming single-end run
                 count_a += 1
@@ -332,18 +348,18 @@ for recname in readnames :
             #if unassigned due to primer mismatches, increment relvant counter
             if result[4]:
                 count_pm += 1
-            #if no pairfile, means read is unassigned and should be written to
+            #if not paired, means read is unassigned and should be written to
             #the file of unassigned reads
-            if not pairfile:
+            if not paired:
                 count_u += 1
                 SeqIO.write(record, uaouthandle, outfmt)
-            #if there is a pairfile, but the mate record is not present,
+            #if it is paired, but the mate record is not present,
             #the read should be written to the unassigned file as it's not
             #possible to identify where it came from.
-            elif pairfile and not materecord:
+            elif paired and not materecord:
                 count_u += 1
                 SeqIO.write(record, uaouthandle, outfmt)
-            #if there is a pairfile and a materecord exists, the materecord
+            #if it is paired and a materecord exists, the materecord
             #can be scanned to try and identify the read's origin
             else:
                 result = identify_read(bc_trie, materecord, bcs, ids, primers, \
@@ -413,21 +429,27 @@ str(max_bc_st_pos) + "\n" \
 "Assigned reads written: " + str(count_a-args.start_numbering_at[0]+1) + "\n" \
 "Reads exceeding acceptable mismatches: " + str(count_pm) + "\n" \
 "Unassigned reads: " + str(count_u) + "\n")
-if pairfile:
+if paired:
     logpath.write("Singletons: " + str(count_s) + "\n\n"
                   "Sample id.\tPaired Reads\n")
 else:
     logpath.write("Sample id.\tReads\n")
 savetxt(logpath, id_counts, fmt='%s', delimiter='\t')
 
-inhandle.close()
+if not idx_exists:
+    inhandle.close()
+    if paired:
+        pairhandle.close()
+        mateouthandle.close()
+        singouthandle.close()
+else:
+    if paired:
+        mateouthandle.close()
+        singouthandle.close()
+        
 outhandle.close()
 maphandle.close()
 uahandle.close()
-if pairfile:
-    pairhandle.close()
-    mateouthandle.close()
-    singouthandle.close()
 logpath.close()
 
 print "Run finished " + strftime("%Y-%m-%d %H:%M:%S") + "."
