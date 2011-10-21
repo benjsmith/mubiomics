@@ -43,12 +43,12 @@ parser.add_argument('-o', '--output_fp', required=True, nargs=1, type=str,
 parser.add_argument('-p', '--pair_fp', nargs='?', type=str,
                     help='''(optional) filepath to mate file of a paired-end
                     sequencing run. If specified, output will consist of an
-                    additional FASTA file, suffixed with ".mates". The
+                    additional file, suffixed with ".mates". The
                     ordering of demultiplexed reads in the two output
                     sequence files will be the same. All demultiplexed reads
-                    that had no mates will be placed in the FASTA file suffixed
+                    that had no mates will be placed in the output file suffixed
                     with ".singletons". All reads that could not be identified
-                    to a sample name will be written to the FASTA dile suffixed
+                    to a sample name will be written to the output file suffixed
                     with ".unassigned".''')
 parser.add_argument('-P', '--paired', action='store_true',
                     help='''activate paired-end mode.''')
@@ -112,7 +112,9 @@ parser.add_argument('-x', '--index_exists', action='store_true',
                     index_db, or by another script using Biopython's
                     SeqIO.index_db(...). If this is activated, make your input
                     file (-i/--input_fp) the path to the database file, there
-                    is no need to activate -u/--use_indexdb in this case.''')
+                    is no need to activate -u/--use_indexdb in this case, but
+                    you should still specify the format of the sequences in the
+                    index file using the -I/--in_fmt option.''')
 parser.add_argument('-v', '--verbose', action='store_true',
                     help='''activate verbose mode. Indicates progress and other
                     information.''')
@@ -149,11 +151,6 @@ idx_exists = args.index_exists
 verbose = args.verbose
 
 #open required filehandles dependent on parameters specified
-#input file
-if not idx_exists:
-    inhandle = open(infile, "rU")
-    if paired:
-        pairhandle = open(pairfile, "rU") #optional input pair file
 
 try :
     outhandle = open(outfile, "wb")
@@ -179,18 +176,26 @@ uahandle = open(str(os.path.splitext(outfile)[0]) + \
 print "\nDemultiplexing run started " + strftime("%Y-%m-%d %H:%M:%S") + "."
 
 if not idx_exists:
+    #if specified not to use an existing index file, either create one,
+    #removing any old one of the same name, first, or index in memory.
     print "Indexing input sequence files..."
     #index sequence input files
-    if use_indexdb and not paired:
+    if use_indexdb:
         indexfile = str(os.path.splitext(os.path.abspath(infile))[0]) + ".idx"
-        indata = SeqIO.index_db(indexfile, infile, infmt)
-    elif use_indexdb and paired:
-        indexfile = str(os.path.splitext(os.path.abspath(infile))[0]) + ".idx"
-        indata = SeqIO.index_db(indexfile, [infile, pairfile], infmt)
-    elif paired and not use_indexdb:
-        indata = SeqIO.index([infile, pairfile], infmt)
+        try:
+            os.remove(indexfile)
+        except OSError:
+            pass
+        if paired:
+            indata = SeqIO.index_db(indexfile, [infile, pairfile], infmt)
+        else:
+            indata = SeqIO.index_db(indexfile, infile, infmt)
     else:
-        indata = SeqIO.index(infile, infmt)
+        if paired:
+            indata = SeqIO.to_dict(SeqIO.parse(infile, infmt))
+            indata.update(SeqIO.to_dict(SeqIO.parse(pairfile, infmt)))
+        else:
+            indata = SeqIO.to_dict(SeqIO.parse(infile, infmt))
 else:
     indata = SeqIO.index_db(infile)
 
@@ -238,94 +243,154 @@ except IndexError:
 print "Building radix trie " + strftime("%Y-%m-%d %H:%M:%S") + "..."
 bc_trie = mmDNAtrie(bcs, max_bc_mismatch) # from demultiplex
 print "Built " + strftime("%Y-%m-%d %H:%M:%S") + "."
-print "Running..."
+print "Building list of readnames to process " + \
+strftime("%Y-%m-%d %H:%M:%S") + "..."
 
 #Initializing counters:
 # id_counts = matrix storing number of reads in each ID from mapping file [0]
-# count = number of reads
-# count_bad = number of reads failing QC
 # count_u = unassigned reads
 # count_a = assigned reads [initial value for output formatting of number of reads in category]
+# count_s = count of singleton reads, i.e., those that were assigned but had no mates
 # count_pm = sequences with primer mismatches, including unassigned that were rejected for too many primer mismatches
-# primer_mismatches = number of primer mismatches in each read
-# primer_lengths = length of primer of each read
-# point_error = primer_mismatches/primer_lengths
-# ua_output_buffer = unassigned reads output buffer
-# a_output_buffer = assigned reads output buffer
+
 
 id_counts = zeros( (len(ids), 2), dtype=object)
 for i, id in enumerate(ids) :
     id_counts[i, 0] = id
 
-count = 0
 count_bad = 0
 count_u = 0
 count_a = args.start_numbering_at[0]-1
+count_s = 0
 count_pm = 0
-#primer_mismatches = [] 
-#primer_lengths = [] 
-#point_error = [] 
-#ua_output_buffer = [] 
-#a_output_buffer = []
 
 #make set of sequence base names that are in both files by strippinp directional
 #identifier
 readnames = set([''.join(name.split("/")[0:-1]) for name in indata.keys()])
-
-
+print "Built " + strftime("%Y-%m-%d %H:%M:%S") + "."
+print "Running..."
+s = 0
 #run main loop to assign id and trim.
-for recname in readnames :
+for r, recname in enumerate(readnames) :
     try :
         #if single-end, will definitely match a record in indata
         #if paired-end, the selected record may have the other dir_id
-        record = indata["/".join([recname, dir_ids[0]])]
+        record = indata["/".join([recname, str(dir_ids[0])])]
         if paired:
             try:
-                materecord = indata["/".join([recname, dir_ids[1]])]
+                materecord = indata["/".join([recname, str(dir_ids[1])])]
             except KeyError:
-                pass
+                materecord = None
                 #mate pair is absent
     except KeyError:
         try:
             #if get here, the mate pair is absent
-            record = indata["/".join([recname, dir_ids[1]])]
+            record = indata["/".join([recname, str(dir_ids[1])])]
+            materecord = None
         except KeyError:
             #if get here, wrong read direction identifiers were entered.
-            print "Read direction identifier doesn't match any that were entered"
+            print "Read direction identifier (-d/--direction_ids) \
+doesn't match any that were entered. Run 'demultiplexer.py -h' for help."
             sys.exit(1)
-        #########################
-        #attempt to identify sequence stored in "record"
-        result = identify_read(bc_trie, record, bcs, ids, primers, \
-                max_pos=max_bc_st_pos, max_p_mismatch=max_prim_mismatch, \
-                rpad=right_padding, bc_len=barcode_length, bc_type=barcode_type) 
-        if result[1] != "Unassigned" :#if a sample ID was assigned:
-            if max_length:#set position of last nucleotide in read, based on
-                #max_length parameter, if set.
-                max_trim_pos = result[0]+max_length
-            else:
-                max_trim_pos = None
-            #assign this record as forward read
-            fwdseq = record[result[0]:max_trim_pos]
-            fwdseq.description = "%s orig_bc=%s new_bc=%s bc_diffs=%i" \
-                            % (fwdseq.name, result[2], result[3], \
-                            ambiguous_seq_dist(result[2], result[3]))                    
+    #correct to here, a record is always assigned successfully
+    #########################
+    #attempt to identify sequence stored in "record"
+    result = identify_read(bc_trie, record, bcs, ids, primers, \
+            max_pos=max_bc_st_pos, max_p_mismatch=max_prim_mismatch, \
+            rpad=right_padding, bc_len=barcode_length, bc_type=barcode_type) 
+    if result[1] != "Unassigned" :#if a sample ID was assigned:
+        s += 1
+        if max_length:#set position of last nucleotide in read, based on
+            #max_length parameter, if set.
+            max_trim_pos = result[0]+max_length
+        else:
+            max_trim_pos = None
+        #assign this record as forward read
+        fwdseq = record[result[0]:max_trim_pos]
+        fwdseq.description = "%s orig_bc=%s new_bc=%s bc_diffs=%i" \
+                        % (fwdseq.name, result[2], result[3], \
+                        ambiguous_seq_dist(result[2], result[3]))                    
+        fwdseq.id = "%s_%i" % (result[1], count_a)
+        if not paired:
+            #write to outhandle if a
+            #perfroming single-end run
             id_counts[bcs[result[3]],1] += 1
-            fwdseq.id = "%s_%i" % (result[1], count_a)
-            if not paired:
-                #write to outhandle if a
-                #perfroming single-end run
-                count_a += 1
-                SeqIO.write(fwdseq, outhandle, outfmt)
-            elif materecord:
-                #if paired-end run and materecord found,
-                #write fwdseq to outhandle and scan revseq to trim primers
-                revseq = materecord
+            count_a += 1
+            SeqIO.write(fwdseq, outhandle, outfmt)
+        elif materecord:
+            #if paired-end run and materecord found,
+            #write fwdseq to outhandle and scan revseq to trim primers
+            revseq = materecord
+            revseq.description = revseq.name
+            revseq.id = "%s_%i" % (result[1], count_a)#id from matched fwdseq
+            query = revprimers[bcs[result[3]]] #primer to look for
+            #if a primer is present, it will search for it
+            try :
+                spos, epos = ambiguous_search(revseq.seq, query, max_prim_mismatch)
+                if max_length:
+                    max_trim_pos = epos+max_length
+                else:
+                    max_trim_pos = None
+                revseq = revseq[epos:max_trim_pos]
+            #if no primer, it will leave the revseq unmodified and write it
+            except TypeError:
+                pass
+            id_counts[bcs[result[3]],1] += 1
+            count_a += 2
+            SeqIO.write(fwdseq, outhandle, outfmt)
+            SeqIO.write(revseq, mateouthandle, outfmt)
+        else:
+            #if paired-end run and no materecord, it will write to the
+            #singletons file
+            count_s += 1
+            SeqIO.write(fwdseq, singouthandle, outfmt)
+    #if no sample ID could be assigned to this read, scan paired mate
+    #if using paired-ends, otherwise write to unassigned file.
+    else:
+        s += 1
+        #if unassigned due to primer mismatches, increment relvant counter
+        #result[4] will only be full when unassigned if there were too many
+        #primer mismatches
+        if result[4]:
+            count_pm += 1
+        #if not paired, means read is unassigned and should be written to
+        #the file of unassigned reads
+        if not paired:
+            count_u += 1
+            SeqIO.write(record, uahandle, outfmt)
+        #if it is paired, but the mate record is not present,
+        #the read should be written to the unassigned file as it's not
+        #possible to identify where it came from.
+        elif paired and not materecord:
+            count_u += 1
+            SeqIO.write(record, uahandle, outfmt)
+        #if it is paired and a materecord exists, the materecord
+        #can be scanned to try and identify the read's origin
+        else:
+            result = identify_read(bc_trie, materecord, bcs, ids, primers, \
+            max_pos=max_bc_st_pos, max_p_mismatch=max_prim_mismatch, \
+            rpad=right_padding, bc_len=barcode_length, bc_type=barcode_type)
+            #if it gets assigned an id, write it to the outhandle and use
+            #the new id (fwdseq.id) with the reverse read
+            if result[1] != "Unassigned" :
+                if max_length:#set position of last nucleotide in read,
+                    #based on max_length parameter, if set.
+                    max_trim_pos = result[0]+max_length
+                else:
+                    max_trim_pos = None
+                #assign this record as forward read
+                fwdseq = materecord[result[0]:max_trim_pos]
+                fwdseq.description = "%s orig_bc=%s new_bc=%s bc_diffs=%i" \
+                                % (fwdseq.name, result[2], result[3], \
+                                ambiguous_seq_dist(result[2], result[3]))                    
+                fwdseq.id = "%s_%i" % (result[1], count_a)
+                revseq = record
                 revseq.description = revseq.name
                 revseq.id = "%s_%i" % (result[1], count_a)#id from matched fwdseq
                 query = revprimers[bcs[result[3]]] #primer to look for
                 #if a primer is present, it will search for it
                 try :
-                    spos, epos = ambiguous_search(revseq.seq, query, max_mismatch)
+                    spos, epos = ambiguous_search(revseq.seq, query, max_prim_mismatch)
                     if max_length:
                         max_trim_pos = epos+max_length
                     else:
@@ -334,81 +399,23 @@ for recname in readnames :
                 #if no primer, it will leave the revseq unmodified and write it
                 except TypeError:
                     pass
-                count_a +=2
+                id_counts[bcs[result[3]],1] += 1
+                count_a += 2
                 SeqIO.write(fwdseq, outhandle, outfmt)
                 SeqIO.write(revseq, mateouthandle, outfmt)
+            #if no match was found, write both records to the unassigned file.
             else:
-                #if paired-end run and no materecord, it will write to the
-                #singletons file
-                count_s += 1
-                SeqIO.write(fwdseq, singouthandle, outfmt)
-        #if no sample ID could be assigned to this read, scan paired mate
-        #if using paired-ends, otherwise write to unassigned file.
-        else:
-            #if unassigned due to primer mismatches, increment relvant counter
-            if result[4]:
-                count_pm += 1
-            #if not paired, means read is unassigned and should be written to
-            #the file of unassigned reads
-            if not paired:
-                count_u += 1
-                SeqIO.write(record, uaouthandle, outfmt)
-            #if it is paired, but the mate record is not present,
-            #the read should be written to the unassigned file as it's not
-            #possible to identify where it came from.
-            elif paired and not materecord:
-                count_u += 1
-                SeqIO.write(record, uaouthandle, outfmt)
-            #if it is paired and a materecord exists, the materecord
-            #can be scanned to try and identify the read's origin
-            else:
-                result = identify_read(bc_trie, materecord, bcs, ids, primers, \
-                max_pos=max_bc_st_pos, max_p_mismatch=max_prim_mismatch, \
-                rpad=right_padding, bc_len=barcode_length, bc_type=barcode_type)
-                #if it gets assigned an id, write it to the outhandle and use
-                #the new id (fwdseq.id) with the reverse read
-                if result[1] != "Unassigned" :
-                    if max_length:#set position of last nucleotide in read,
-                        #based on max_length parameter, if set.
-                        max_trim_pos = result[0]+max_length
-                    else:
-                        max_trim_pos = None
-                    #assign this record as forward read
-                    fwdseq = materecord[result[0]:max_trim_pos]
-                    fwdseq.description = "%s orig_bc=%s new_bc=%s bc_diffs=%i" \
-                                    % (fwdseq.name, result[2], result[3], \
-                                    ambiguous_seq_dist(result[2], result[3]))                    
-                    id_counts[bcs[result[3]],1] += 1
-                    fwdseq.id = "%s_%i" % (result[1], count_a)
-                    revseq = record
-                    revseq.description = revseq.name
-                    revseq.id = "%s_%i" % (result[1], count_a)#id from matched fwdseq
-                    query = revprimers[bcs[result[3]]] #primer to look for
-                    #if a primer is present, it will search for it
-                    try :
-                        spos, epos = ambiguous_search(revseq.seq, query, max_mismatch)
-                        if max_length:
-                            max_trim_pos = epos+max_length
-                        else:
-                            max_trim_pos = None
-                        revseq = revseq[epos:max_trim_pos]
-                    #if no primer, it will leave the revseq unmodified and write it
-                    except TypeError:
-                        pass
-                    count_a += 2
-                    SeqIO.write(fwdseq, outhandle, outfmt)
-                    SeqIO.write(revseq, mateouthandle, outfmt)
-                #if no match was found, write both records to the unassigned file.
-                else:
-                    count_u += 2
-                    SeqIO.write(record, uaouthandle, outfmt)
-                    SeqIO.write(materecord, uaouthandle, outfmt)
-                revseq = record    
+                count_u += 2
+                SeqIO.write(record, uahandle, outfmt)
+                SeqIO.write(materecord, uahandle, outfmt)
+                   
 #Progress indicator
     if verbose:
-        sys.stdout.write("Assigned: " + str(count_a) + ", Unassigned: " + str(count_u))
+        sys.stdout.write("Assigned: " + str(count_a) + ", Processed: " + str(r))
         sys.stdout.flush()
-        sys.stdout.write("\b"*len("Assigned: " + str(count_a) + ", Unassigned: " + str(count_u)))
+        sys.stdout.write("\b"*len("Assigned: " + str(count_a) + ", Processed: " + str(r)))
+#set total count after run finished
+count = count_a + count_u + count_s
 
 
 
@@ -425,7 +432,7 @@ str(max_bc_st_pos) + "\n" \
 "Number of bases between end of barcode and start of primer " \
 + str(right_padding) + "\n\n" \
 "Counts:\n" \
-"Total reads parsed: " + str(count_a + count_u + count_s) + "\n" \
+"Total reads parsed: " + str(count) + "\n" \
 "Assigned reads written: " + str(count_a-args.start_numbering_at[0]+1) + "\n" \
 "Reads exceeding acceptable mismatches: " + str(count_pm) + "\n" \
 "Unassigned reads: " + str(count_u) + "\n")
@@ -436,23 +443,20 @@ else:
     logpath.write("Sample id.\tReads\n")
 savetxt(logpath, id_counts, fmt='%s', delimiter='\t')
 
-if not idx_exists:
-    inhandle.close()
-    if paired:
-        pairhandle.close()
-        mateouthandle.close()
-        singouthandle.close()
-else:
-    if paired:
-        mateouthandle.close()
-        singouthandle.close()
+
+if paired:
+    mateouthandle.close()
+    singouthandle.close()
         
 outhandle.close()
 maphandle.close()
 uahandle.close()
 logpath.close()
 
-print "Run finished " + strftime("%Y-%m-%d %H:%M:%S") + "."
+print "\nRun finished " + strftime("%Y-%m-%d %H:%M:%S") + "."
+
+print s, r
+
 
 
 
