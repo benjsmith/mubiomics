@@ -192,10 +192,10 @@ if not idx_exists:
             indata = SeqIO.index_db(indexfile, infile, infmt)
     else:
         if paired:
-            indata = SeqIO.to_dict(SeqIO.parse(infile, infmt))
-            indata.update(SeqIO.to_dict(SeqIO.parse(pairfile, infmt)))
+            indata = SeqIO.index(infile, infmt)
+            indata.update(SeqIO.index(pairfile, infmt))
         else:
-            indata = SeqIO.to_dict(SeqIO.parse(infile, infmt))
+            indata = SeqIO.index(SeqIO.parse(infile, infmt))
 else:
     indata = SeqIO.index_db(infile)
 
