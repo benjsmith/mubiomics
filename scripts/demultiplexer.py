@@ -347,7 +347,6 @@ doesn't match any that were entered. Run 'demultiplexer.py -h' for help."
     #if no sample ID could be assigned to this read, scan paired mate
     #if using paired-ends, otherwise write to unassigned file.
     else:
-        s += 1
         #if unassigned due to primer mismatches, increment relvant counter
         #result[4] will only be full when unassigned if there were too many
         #primer mismatches
