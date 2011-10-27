@@ -103,9 +103,10 @@ parser.add_argument('-n', '--start_numbering_at', nargs=1, default=[1], type=int
                     help='''set the start number for labeling assigned reads''')
 parser.add_argument('-u', '--use_indexdb', action='store_true',
                     help='''activate database indexing mode. This should be
-                    used if the mate file is larger than the available RAM. It
-                    indexes the entries in the mate file and temporarily
-                    stores them in an SQL database file.''')
+                    used if the mate file is larger than one fifth of the
+                    available RAM. It parses the entries in the mate file
+                    and stores them in an SQL database file in the directory
+                    where the input sequences reside.''')
 parser.add_argument('-x', '--index_exists', action='store_true',
                     help='''activate this if sequences have already been indexed
                     and stored in an SQL database file by this script using
@@ -192,8 +193,9 @@ if not idx_exists:
             indata = SeqIO.index_db(indexfile, infile, infmt)
     else:
         if paired:
-            indata = SeqIO.index(infile, infmt)
-            indata.update(SeqIO.index(pairfile, infmt))
+            indata = SeqIO.to_dict(SeqIO.parse(infile, infmt))
+            pairdata = SeqIO.to_dict(SeqIO.parse(pairfile, infmt))
+            indata.update(pairdata)
         else:
             indata = SeqIO.index(SeqIO.parse(infile, infmt))
 else:
@@ -269,7 +271,6 @@ count_pm = 0
 readnames = set([''.join(name.split("/")[0:-1]) for name in indata.keys()])
 print "Built " + strftime("%Y-%m-%d %H:%M:%S") + "."
 print "Running..."
-s = 0
 #run main loop to assign id and trim.
 for r, recname in enumerate(readnames) :
     try :
@@ -299,7 +300,6 @@ doesn't match any that were entered. Run 'demultiplexer.py -h' for help."
             max_pos=max_bc_st_pos, max_p_mismatch=max_prim_mismatch, \
             rpad=right_padding, bc_len=barcode_length, bc_type=barcode_type) 
     if result[1] != "Unassigned" :#if a sample ID was assigned:
-        s += 1
         if max_length:#set position of last nucleotide in read, based on
             #max_length parameter, if set.
             max_trim_pos = result[0]+max_length
@@ -455,7 +455,6 @@ logpath.close()
 
 print "\nRun finished " + strftime("%Y-%m-%d %H:%M:%S") + "."
 
-print s, r
 
 
 
