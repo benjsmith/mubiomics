@@ -461,7 +461,8 @@ if paired:
         
 outhandle.close()
 maphandle.close()
-uahandle.close()
+if not suppress:
+    uahandle.close()
 logpath.close()
 
 print "\nRun finished " + strftime("%Y-%m-%d %H:%M:%S") + "."
