@@ -27,12 +27,15 @@ parser = argparse.ArgumentParser(
     and producing sequence files containing assigned and unassigned
     sequences, respectively, and a log file. Optionally, it can handle paired
     end reads where the barcode is only on one end. The mated read names
-    of teh end with no barcode will be prefixed with the same name as the
+    of the end with no barcode will be prefixed with the same name as the
     barcoded end read and will appear at the same position in the mated output
-    file. If barcodes are on both ends, either run each file separately, as
-    though demultiplexing for single end reads. If barcodes on each ends are
-    different, you could also join the two sequence files and demultiplex it in
-    one, using the mapping file to control naming of forward and reverse reads.
+    file. WARNING: This can be extremely slow or use a ridiculous amount of
+    memory, depending on which options you specify and on the sizes of your input
+    sequence files. If barcodes are on both ends, either run each file
+    separately, as though demultiplexing for single end reads. If barcodes on
+    each ends are different, you could also join the two sequence files and
+    demultiplex it in one, using the mapping file to control naming of forward
+    and reverse reads.
     ''',
     formatter_class= argparse.ArgumentDefaultsHelpFormatter,
     fromfile_prefix_chars='@')
@@ -116,6 +119,10 @@ parser.add_argument('-x', '--index_exists', action='store_true',
                     is no need to activate -u/--use_indexdb in this case, but
                     you should still specify the format of the sequences in the
                     index file using the -I/--in_fmt option.''')
+parser.add_argument('-s', '--suppress_unassigned', action='store_true',
+                    help='''activate this mode to stop unassigned sequences
+                    being written. This can save space if you don't care about
+                    retaining sequences that couldn't be assigned an I.D.''')
 parser.add_argument('-v', '--verbose', action='store_true',
                     help='''activate verbose mode. Indicates progress and other
                     information.''')
@@ -149,6 +156,7 @@ max_bc_st_pos = args.max_bc_start_pos[0]
 right_padding = args.right_pad[0]
 use_indexdb = args.use_indexdb
 idx_exists = args.index_exists
+suppress = args.suppress_unassigned
 verbose = args.verbose
 
 #open required filehandles dependent on parameters specified
@@ -170,8 +178,9 @@ except IOError:
         singouthandle = open(str(os.path.splitext(outfile)[0]) + \
 ".singletons.fasta", "wb") # singleton output fasta file
 maphandle = open(mapfile, "rU") # mapping file, tsv format
-uahandle = open(str(os.path.splitext(outfile)[0]) + \
-".unassigned.fasta", "wb") # unassigned output fasta file
+if not suppress:
+    uahandle = open(str(os.path.splitext(outfile)[0]) + \
+    ".unassigned.fasta", "wb") # unassigned output fasta file
 
 
 print "\nDemultiplexing run started " + strftime("%Y-%m-%d %H:%M:%S") + "."
@@ -352,17 +361,19 @@ doesn't match any that were entered. Run 'demultiplexer.py -h' for help."
         #primer mismatches
         if result[4]:
             count_pm += 1
-        #if not paired, means read is unassigned and should be written to
+        #if not paired, means read is unassigned and can be written to
         #the file of unassigned reads
         if not paired:
             count_u += 1
-            SeqIO.write(record, uahandle, outfmt)
+            if not suppress:
+                SeqIO.write(record, uahandle, outfmt)
         #if it is paired, but the mate record is not present,
-        #the read should be written to the unassigned file as it's not
+        #the read can be written to the unassigned file as it's not
         #possible to identify where it came from.
         elif paired and not materecord:
             count_u += 1
-            SeqIO.write(record, uahandle, outfmt)
+            if not suppress:
+                SeqIO.write(record, uahandle, outfmt)
         #if it is paired and a materecord exists, the materecord
         #can be scanned to try and identify the read's origin
         else:
@@ -402,11 +413,12 @@ doesn't match any that were entered. Run 'demultiplexer.py -h' for help."
                 count_a += 2
                 SeqIO.write(fwdseq, outhandle, outfmt)
                 SeqIO.write(revseq, mateouthandle, outfmt)
-            #if no match was found, write both records to the unassigned file.
+            #if no match was found, can write both records to the unassigned file.
             else:
                 count_u += 2
-                SeqIO.write(record, uahandle, outfmt)
-                SeqIO.write(materecord, uahandle, outfmt)
+                if not suppress:
+                    SeqIO.write(record, uahandle, outfmt)
+                    SeqIO.write(materecord, uahandle, outfmt)
                    
 #Progress indicator
     if verbose:
