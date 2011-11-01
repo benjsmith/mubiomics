@@ -11,6 +11,7 @@ from Bio.Data import IUPACData
 import sys, os, re, argparse, resource
 from time import strftime
 from numpy import *
+from collections import deque
 
 #Add parent directory of current file to sys.path so imports can be made from folder
 sys.path.insert(0,os.path.dirname(os.path.dirname(sys.argv[0])))
@@ -27,9 +28,9 @@ parser = argparse.ArgumentParser(
     and producing sequence files containing assigned and unassigned
     sequences, respectively, and a log file. Optionally, it can handle paired
     end reads where the barcode is only on one end. The mated read names
-    of the end with no barcode will be prefixed with the same name as the
+    from the end with no barcode will be prefixed with the same name as the
     barcoded end read and will appear at the same position in the mated output
-    file. WARNING: This can be extremely slow or use a ridiculous amount of
+    file. WARNING: This can be very slow or use a large amount of
     memory, depending on which options you specify and on the sizes of your input
     sequence files. If barcodes are on both ends, either run each file
     separately, as though demultiplexing for single end reads. If barcodes on
@@ -110,6 +111,13 @@ parser.add_argument('-u', '--use_indexdb', action='store_true',
                     available RAM. It parses the entries in the mate file
                     and stores them in an SQL database file in the directory
                     where the input sequences reside.''')
+parser.add_argument('-y', '--in_mem', action='store_true',
+                    help='''activate this if using -u and you have enough
+                    RAM to place the SQLite3 database in memory. It seems to
+                    require roughly half the size of your combined input file(s)
+                    and may speed up the run, though the speed-up may not be
+                    much greater than running in the default mode (i.e. no -u).
+                    ''')
 parser.add_argument('-x', '--index_exists', action='store_true',
                     help='''activate this if sequences have already been indexed
                     and stored in an SQL database file by this script using
@@ -155,6 +163,7 @@ max_prim_mismatch = args.max_primer_mismatch[0]
 max_bc_st_pos = args.max_bc_start_pos[0]
 right_padding = args.right_pad[0]
 use_indexdb = args.use_indexdb
+in_mem = args.in_mem
 idx_exists = args.index_exists
 suppress = args.suppress_unassigned
 verbose = args.verbose
@@ -185,12 +194,40 @@ if not suppress:
 
 print "\nDemultiplexing run started " + strftime("%Y-%m-%d %H:%M:%S") + "."
 
+print "Building list of readnames to process " + \
+strftime("%Y-%m-%d %H:%M:%S") + "..."
+#make set of sequence base names that are in both files by stripping directional
+#identifier
+readnames1 = deque([])
+readnames2 = deque([])
+for i, n in enumerate(SeqIO.parse(infile, infmt)):
+    if verbose:
+        sys.stdout.write("File 1, Read: " + str(i+1))
+        sys.stdout.flush()
+        sys.stdout.write("\b"*len("File 1, Read: " + str(i+1)))
+    seqname1 = n.id.split("/")[0]
+    readnames1.append(seqname1)
+readnames = set(readnames1)
+readnames1.clear()
+print ""
+for j, m in enumerate(SeqIO.parse(pairfile, infmt)):
+    if verbose:
+        sys.stdout.write("File 2, Read: " + str(j+1))
+        sys.stdout.flush()
+        sys.stdout.write("\b"*len("File 2, Read: " + str(j+1)))
+    seqname2 = m.id.split("/")[0]
+    readnames2.append(seqname2)
+readnames.union(readnames2)
+readnames2.clear()
+print ""
+print "Built " + strftime("%Y-%m-%d %H:%M:%S") + "."
+
 if not idx_exists:
     #if specified not to use an existing index file, either create one,
     #removing any old one of the same name, first, or index in memory.
     print "Indexing input sequence files..."
     #index sequence input files
-    if use_indexdb:
+    if use_indexdb and not in_mem:
         indexfile = str(os.path.splitext(os.path.abspath(infile))[0]) + ".idx"
         try:
             os.remove(indexfile)
@@ -200,15 +237,23 @@ if not idx_exists:
             indata = SeqIO.index_db(indexfile, [infile, pairfile], infmt)
         else:
             indata = SeqIO.index_db(indexfile, infile, infmt)
+    elif use_indexdb and in_mem:
+        if paired:
+            indata = SeqIO.index_db(":memory:", [infile, pairfile], infmt)
+        else:
+            indata = SeqIO.index_db(":memory:", infile, infmt)
     else:
         if paired:
-            indata = SeqIO.to_dict(SeqIO.parse(infile, infmt))
-            pairdata = SeqIO.to_dict(SeqIO.parse(pairfile, infmt))
-            indata.update(pairdata)
+            initindata = SeqIO.index(infile, infmt)
+            pairdata = SeqIO.index(pairfile, infmt)
+            indata = MultiIndexDict(initindata, pairdata)
         else:
             indata = SeqIO.index(SeqIO.parse(infile, infmt))
+#elif idx_exists and in_mem:
+#    indata = SeqIO.index_db(":memory:", infile)
 else:
     indata = SeqIO.index_db(infile)
+
 
 bcs = {} #Initialize bcs dictionary. Will have barcode as keyword 
 #and position in list as value
@@ -254,8 +299,6 @@ except IndexError:
 print "Building radix trie " + strftime("%Y-%m-%d %H:%M:%S") + "..."
 bc_trie = mmDNAtrie(bcs, max_bc_mismatch) # from demultiplex
 print "Built " + strftime("%Y-%m-%d %H:%M:%S") + "."
-print "Building list of readnames to process " + \
-strftime("%Y-%m-%d %H:%M:%S") + "..."
 
 #Initializing counters:
 # id_counts = matrix storing number of reads in each ID from mapping file [0]
@@ -275,13 +318,12 @@ count_a = args.start_numbering_at[0]-1
 count_s = 0
 count_pm = 0
 
-#make set of sequence base names that are in both files by strippinp directional
-#identifier
-readnames = set([''.join(name.split("/")[0:-1]) for name in indata.keys()])
-print "Built " + strftime("%Y-%m-%d %H:%M:%S") + "."
+
 print "Running..."
 #run main loop to assign id and trim.
-for r, recname in enumerate(readnames) :
+r = 0
+while readnames:
+    recname = readnames.pop()
     try :
         #if single-end, will definitely match a record in indata
         #if paired-end, the selected record may have the other dir_id
@@ -345,7 +387,7 @@ doesn't match any that were entered. Run 'demultiplexer.py -h' for help."
             except TypeError:
                 pass
             id_counts[bcs[result[3]],1] += 1
-            count_a += 2
+            count_a += 1
             SeqIO.write(fwdseq, outhandle, outfmt)
             SeqIO.write(revseq, mateouthandle, outfmt)
         else:
@@ -410,23 +452,24 @@ doesn't match any that were entered. Run 'demultiplexer.py -h' for help."
                 except TypeError:
                     pass
                 id_counts[bcs[result[3]],1] += 1
-                count_a += 2
+                count_a += 1
                 SeqIO.write(fwdseq, outhandle, outfmt)
                 SeqIO.write(revseq, mateouthandle, outfmt)
             #if no match was found, can write both records to the unassigned file.
             else:
-                count_u += 2
+                count_u += 1
                 if not suppress:
                     SeqIO.write(record, uahandle, outfmt)
                     SeqIO.write(materecord, uahandle, outfmt)
                    
+    r += 1
 #Progress indicator
     if verbose:
         sys.stdout.write("Assigned: " + str(count_a) + ", Processed: " + str(r))
         sys.stdout.flush()
         sys.stdout.write("\b"*len("Assigned: " + str(count_a) + ", Processed: " + str(r)))
 #set total count after run finished
-count = count_a + count_u + count_s
+count = r
 
 
 

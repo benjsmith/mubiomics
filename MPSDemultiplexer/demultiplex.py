@@ -1,5 +1,6 @@
 #!/usr/local/bin/python
 
+from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.Alphabet import IUPAC
 from Bio.Data import IUPACData
@@ -7,6 +8,29 @@ from patricia import *
 from hamming import *
 from numpy import *
 import re, sys
+
+class MultiIndexDict:
+    """Thanks to Brad Chapman for posting this answer on Stack Overflow
+    
+    @usage: indata = SeqIO.index("f001", "fasta")
+            pairdata = SeqIO.index("f002", "fasta")
+            combo = MultiIndexDict(indata, pairdata)
+            
+            print combo['gi|3318709|pdb|1A91|'].description
+            print combo['gi|1348917|gb|G26685|G26685'].description
+            print combo["key_failure"]
+    """
+    def __init__(self, *indexes):
+        self._indexes = indexes
+    def __getitem__(self, key):
+        for idx in self._indexes:
+            try:
+                return idx[key]
+            except KeyError:
+                pass
+        raise KeyError("{0} not found".format(key))
+
+        
     
 def quality_control(entry, av_score=40, min_score=10, \
     n_trim=0, min_len=80, win=10):
