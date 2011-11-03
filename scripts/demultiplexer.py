@@ -191,10 +191,9 @@ if not suppress:
     uahandle = open(str(os.path.splitext(outfile)[0]) + \
     ".unassigned.fasta", "wb") # unassigned output fasta file
 
-
-print "\nDemultiplexing run started " + strftime("%Y-%m-%d %H:%M:%S") + "."
-
-print "Building list of readnames to process " + \
+if verbose :
+    print "\nDemultiplexing run started " + strftime("%Y-%m-%d %H:%M:%S") + "."
+    print "Building list of readnames to process " + \
 strftime("%Y-%m-%d %H:%M:%S") + "..."
 #make set of sequence base names that are in both files by stripping directional
 #identifier
@@ -219,13 +218,15 @@ for j, m in enumerate(SeqIO.parse(pairfile, infmt)):
     readnames2.append(seqname2)
 readnames.union(readnames2)
 readnames2.clear()
-print ""
-print "Built " + strftime("%Y-%m-%d %H:%M:%S") + "."
+if verbose:
+    print ""
+    print "Built " + strftime("%Y-%m-%d %H:%M:%S") + "."
 
 if not idx_exists:
     #if specified not to use an existing index file, either create one,
     #removing any old one of the same name, first, or index in memory.
-    print "Indexing input sequence files..."
+    if verbose:
+        print "Indexing input sequence files..."
     #index sequence input files
     if use_indexdb and not in_mem:
         indexfile = str(os.path.splitext(os.path.abspath(infile))[0]) + ".idx"
@@ -296,9 +297,11 @@ except IndexError:
 
 #construct radix trie containing (mismatched) barcodes for efficient
 #storage and searching
-print "Building radix trie " + strftime("%Y-%m-%d %H:%M:%S") + "..."
+if verbose:
+    print "Building radix trie " + strftime("%Y-%m-%d %H:%M:%S") + "..."
 bc_trie = mmDNAtrie(bcs, max_bc_mismatch) # from demultiplex
-print "Built " + strftime("%Y-%m-%d %H:%M:%S") + "."
+if verbose:
+    print "Built " + strftime("%Y-%m-%d %H:%M:%S") + "."
 
 #Initializing counters:
 # id_counts = matrix storing number of reads in each ID from mapping file [0]
@@ -318,8 +321,8 @@ count_a = args.start_numbering_at[0]-1
 count_s = 0
 count_pm = 0
 
-
-print "Running..."
+if verbose:
+    print "Running..."
 #run main loop to assign id and trim.
 r = 0
 while readnames:
@@ -507,8 +510,8 @@ maphandle.close()
 if not suppress:
     uahandle.close()
 logpath.close()
-
-print "\nRun finished " + strftime("%Y-%m-%d %H:%M:%S") + "."
+if verbose:
+    print "\nRun finished " + strftime("%Y-%m-%d %H:%M:%S") + "."
 
 
 
