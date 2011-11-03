@@ -174,22 +174,22 @@ try :
     outhandle = open(outfile, "wb")
     if paired:
         mateouthandle = open(str(os.path.splitext(outfile)[0]) + \
-".mates.fasta", "wb") # mate output fasta file
+".mates." + outfmt, "wb") # mate output fasta file
         singouthandle = open(str(os.path.splitext(outfile)[0]) + \
-".singletons.fasta", "wb") # singleton output fasta file
+".singletons." + outfmt, "wb") # singleton output fasta file
 except IOError:
     outdir = str(os.path.dirname(os.path.abspath(outfile)))
     os.mkdir(outdir)
     outhandle = open(outfile, "wb") # output fasta file
     if paired:
         mateouthandle = open(str(os.path.splitext(outfile)[0]) + \
-".mates.fasta", "wb") # mate output fasta file
+".mates." + outfmt, "wb") # mate output fasta file
         singouthandle = open(str(os.path.splitext(outfile)[0]) + \
-".singletons.fasta", "wb") # singleton output fasta file
+".singletons." + outfmt, "wb") # singleton output fasta file
 maphandle = open(mapfile, "rU") # mapping file, tsv format
 if not suppress:
     uahandle = open(str(os.path.splitext(outfile)[0]) + \
-    ".unassigned.fasta", "wb") # unassigned output fasta file
+    ".unassigned." + outfmt, "wb") # unassigned output fasta file
 
 if verbose :
     print "\nDemultiplexing run started " + strftime("%Y-%m-%d %H:%M:%S") + "."
