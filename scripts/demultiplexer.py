@@ -209,15 +209,16 @@ for i, n in enumerate(SeqIO.parse(infile, infmt)):
 readnames = set(readnames1)
 readnames1.clear()
 print ""
-for j, m in enumerate(SeqIO.parse(pairfile, infmt)):
-    if verbose:
-        sys.stdout.write("File 2, Read: " + str(j+1))
-        sys.stdout.flush()
-        sys.stdout.write("\b"*len("File 2, Read: " + str(j+1)))
-    seqname2 = m.id.split("/")[0]
-    readnames2.append(seqname2)
-readnames.union(readnames2)
-readnames2.clear()
+if paired:
+    for j, m in enumerate(SeqIO.parse(pairfile, infmt)):
+        if verbose:
+            sys.stdout.write("File 2, Read: " + str(j+1))
+            sys.stdout.flush()
+            sys.stdout.write("\b"*len("File 2, Read: " + str(j+1)))
+        seqname2 = m.id.split("/")[0]
+        readnames2.append(seqname2)
+    readnames.union(readnames2)
+    readnames2.clear()
 if verbose:
     print ""
     print "Built " + strftime("%Y-%m-%d %H:%M:%S") + "."
