@@ -477,7 +477,7 @@ count = r
 
 
 
-logpath = open(str(os.path.splitext(outfile)[0]) + ".log ","wb")
+logpath = open(str(os.path.splitext(outfile)[0]) + ".log","wb")
 logpath.write("Logfile for demultiplexing of " \
 + infile + "\n" + strftime("%Y-%m-%d %H:%M:%S") + "\n\n" \
 "Parameters specified:\n" \
