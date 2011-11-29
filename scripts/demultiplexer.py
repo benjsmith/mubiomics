@@ -111,13 +111,6 @@ parser.add_argument('-u', '--use_indexdb', action='store_true',
                     available RAM. It parses the entries in the mate file
                     and stores them in an SQL database file in the directory
                     where the input sequences reside.''')
-parser.add_argument('-y', '--in_mem', action='store_true',
-                    help='''activate this if using -u and you have enough
-                    RAM to place the SQLite3 database in memory. It seems to
-                    require roughly half the size of your combined input file(s)
-                    and may speed up the run, though the speed-up may not be
-                    much greater than running in the default mode (i.e. no -u).
-                    ''')
 parser.add_argument('-x', '--index_exists', action='store_true',
                     help='''activate this if sequences have already been indexed
                     and stored in an SQL database file by this script using
@@ -163,7 +156,6 @@ max_prim_mismatch = args.max_primer_mismatch[0]
 max_bc_st_pos = args.max_bc_start_pos[0]
 right_padding = args.right_pad[0]
 use_indexdb = args.use_indexdb
-in_mem = args.in_mem
 idx_exists = args.index_exists
 suppress = args.suppress_unassigned
 verbose = args.verbose
@@ -229,7 +221,7 @@ if not idx_exists:
     if verbose:
         print "Indexing input sequence files..."
     #index sequence input files
-    if use_indexdb and not in_mem:
+    if use_indexdb:
         indexfile = str(os.path.splitext(os.path.abspath(infile))[0]) + ".idx"
         try:
             os.remove(indexfile)
@@ -239,18 +231,13 @@ if not idx_exists:
             indata = SeqIO.index_db(indexfile, [infile, pairfile], infmt)
         else:
             indata = SeqIO.index_db(indexfile, infile, infmt)
-    elif use_indexdb and in_mem:
-        if paired:
-            indata = SeqIO.index_db(":memory:", [infile, pairfile], infmt)
-        else:
-            indata = SeqIO.index_db(":memory:", infile, infmt)
     else:
         if paired:
             initindata = SeqIO.index(infile, infmt)
             pairdata = SeqIO.index(pairfile, infmt)
             indata = MultiIndexDict(initindata, pairdata)
         else:
-            indata = SeqIO.index(SeqIO.parse(infile, infmt))
+            indata = SeqIO.index(infile, infmt)
 #elif idx_exists and in_mem:
 #    indata = SeqIO.index_db(":memory:", infile)
 else:

@@ -32,6 +32,9 @@ parser.add_argument('-s', '--split_on', nargs=1, default=['.'], type=str,
                     help='''set the chracter to split the sample name on. E.g.,
                     if the read name is sample1_00001 and the split is set to
                     "_", the sample name will be read as "sample1".''')
+parser.add_argument('-n', '--noise', action='store_true',
+                    help='''condense counts for all clusters that do not match
+                    any database sequences into a group called "Noise".''')
 parser.add_argument('-v', '--verbose', action='store_true',
                     help='''activate verbose mode. Indicates progress and other
                     information.''')
@@ -44,6 +47,7 @@ outfile = args.output_fp[0]
 mapfile = args.map_fp[0]
 split_on = args.split_on[0]
 verbose = args.verbose
+noise = args.noise
 
 #open input/output handles
 handle1 = open(infile, "rb") # uclust output file handle
@@ -102,7 +106,14 @@ separated by a space."
         #reads dictionary
         read2sample[orig] = sample_ids.index(id[0])
         #build list of species' names
-        tax_name = separated[9].rstrip("\n")
+        #if hit, take last column as taxon name. split("/") used in case
+        #matching record contains original sequence name, then the part
+        #containing the read direction identifier and all after will be stripped
+        if line[0] == "H":
+            tax_name = separated[9].rstrip("\n").split("/")[0]
+        #if new seed, take penultimate column as taxon name
+        else:
+            tax_name = separated[8].split("/")[0]
         if tax_name not in taxon_names :
             taxon_names.append(tax_name)
         try:
@@ -152,28 +163,35 @@ for i, otu in enumerate(otus) :
 for i, tax_name in enumerate(taxon_names) :
     otu_table[i+1, -1] = tax_name
 #store header
-temp_table=[otu_table[0]]
-#fill with samples with no taxon identification
-noise_list = []
-for row in otu_table[1:] :
-#verify that sequence match was with database and not internal
-    if max(row[1:-1]) > 0 and str(row[-1]).split(str(split_on))[0] not in sample_ids:
-        temp_table.append(row)
-#otherwise, add to noise list
-    if str(row[-1]).split(str(split_on))[0] in sample_ids:
-         noise_list.append(row[1:-1])
-#clean up
-otu_table = None
-noise_table = array( noise_list , dtype=int )
-noise_list = None
-noise_id = array( ["0"], dtype=object)
-noise_name = array( ["Noise"], dtype=object)
-#number of noise reads in sample
-noise_counts = noise_table.sum(axis=0)
-noise_row = hstack( (noise_id, noise_counts, noise_name) )
-curated_otu_table=vstack( (temp_table, noise_row) )
-noise_table = None
-temp_table = None
+#Check whether a "Noise" row should be created
+if noise:
+    #store header
+    temp_table=[otu_table[0]]
+    noise_list = []
+    for row in otu_table[1:] :
+    #verify that sequence match was with database and not internal
+        if max(row[1:-1]) > 0 and str(row[-1]).split(str(split_on))[0] not in sample_ids:
+            temp_table.append(row)
+    #otherwise, add to noise list
+        if str(row[-1]).split(str(split_on))[0] in sample_ids:
+             noise_list.append(row[1:-1])
+    #clean up
+    otu_table = None
+    if len(noise_list) == 0:
+        noise_table = zeros((1, len(sample_ids)-2), dtype=int)
+    else:
+        noise_table = array( noise_list , dtype=int )
+    noise_list = None
+    noise_id = array( ["0"], dtype=object)
+    noise_name = array( ["Noise"], dtype=object)
+    #number of noise reads in sample
+    noise_counts = noise_table.sum(axis=0)
+    noise_row = hstack( (noise_id, noise_counts, noise_name) )
+    curated_otu_table=vstack( (temp_table, noise_row) )
+    noise_table = None
+    temp_table = None
+else: #If no noise row required, use table currently stored in otu_table
+    curated_otu_table = otu_table
 savetxt(handle2, curated_otu_table, fmt='%s', delimiter='\t')    
 print "Finished."
 handle1.close()

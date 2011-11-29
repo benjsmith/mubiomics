@@ -239,13 +239,13 @@ def identify_read(ptrie, rec, barcodes, ids, primers, bc_len=8, rpad=4, \
                     dist = \
                         ambiguous_seq_dist(str(rec.seq)[prim_start: \
                         prim_end], prim)
-                    seq_start_dict[pos] = prim_end+1
+                    seq_start_dict[pos] = prim_end
                 #if no primers, i.e. fragmented DNA, minimize the edit distance
                 #of the potential barcodes.
                 else:
                     len_prim = 0
                     dist = bc_dist_list[0][1]
-                    seq_start_dict[pos] = pos + bc_len + 1
+                    seq_start_dict[pos] = pos + bc_len
                 dist_dict[pos] = dist
                 id_dict[pos] = new_id
                 old_bc_dict[pos] = bc_match[1]

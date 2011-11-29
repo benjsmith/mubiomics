@@ -70,12 +70,14 @@ if verbose:
 
 #parse the input, 'hit' by 'hit', and add info from columns to
 #data holders.
-otus = []
-taxon_names = []
-otu_indices = []
+otus = [] #list to fill with OTU id numbers
+taxon_names = [] #list to fill with names of sequences that were matched to
+otu_indices = [] #list to fill with tuples containing position to record
+#each hit in the output table; row corresponds to otu and column corresponds to
+#sample id
 for i, line in enumerate(handle1) :
-    #if hit
-    if line[0] == "H" :
+    #if read is hit or new seed
+    if line[0] == "H" or line[0] =="S" :
         if verbose :#print line number to stdout
             sys.stdout.write(str(i))
             sys.stdout.flush()
@@ -87,11 +89,21 @@ for i, line in enumerate(handle1) :
         if separated[1] not in otus :
             otus.append(separated[1])
         #build list of species' names
-        if separated[9].rstrip("\n") not in taxon_names :
-            taxon_names.append(separated[9].rstrip("\n"))
+        #if hit, take last column as taxon name. split("/") used in case
+        #matching record contains original sequence name, then the part
+        #containing the read direction identifier and all after will be stripped
+        if line[0] == "H":
+            if separated[9].rstrip("\n").split("/")[0] not in taxon_names :
+                taxon_names.append(separated[9].rstrip("\n").split("/")[0])
+        #if new seed, take penultimate column as taxon name
+        else:
+            if separated[8].split("/")[0] not in taxon_names :
+                taxon_names.append(separated[8].split("/")[0])
         #create tuples of indices of OTU ID and corresponding sample name 
         otu_indices.append([otus.index(separated[1])+1, \
         sample_ids.index(id[0])])
+    #if read used as new seed
+        
 
 
 if verbose:

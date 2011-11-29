@@ -16,11 +16,15 @@ parser = argparse.ArgumentParser(
     fromfile_prefix_chars='@')
 parser.add_argument('-i','--input_fp', required=True, nargs=1,
                     type=str, help='''input filepath.''')
+parser.add_argument('-I', '--in_fmt', required=True, nargs=1, type=str,
+                    help='''input file format (fasta or fastq)''')
+parser.add_argument('-O', '--out_fmt', required=True, nargs=1, type=str,
+                    help='''required output file format (fasta or fastq)''')
 parser.add_argument('-m', '--map_fp', required=True, nargs=1, type=str,
                     help='''mapping filepath. Mapping file must be a text
                     file in TSV format with a column of sample names as the
                     first column.''')
-parser.add_argument('-t', '--trim', action='store_true', 
+parser.add_argument('-t', '--trim_header', action='store_true', 
                     help='''enables trimming of additional info from header
                     line leaving just the piece before the first space.''')
 parser.add_argument('-v', '--verbose', action='store_true', 
@@ -33,7 +37,9 @@ parser.add_argument('-a', '--aligned', action='store_true',
 args = parser.parse_args()
 infile = args.input_fp[0]
 mapfile = args.map_fp[0]
-trim = args.trim
+trim = args.trim_header
+infmt = args.in_fmt[0]
+outfmt = args.out_fmt[0]
 verbose = args.verbose
 aligned = args.aligned
 
@@ -50,7 +56,7 @@ try:
 except OSError:
     pass
     
-record_iter = SeqIO.parse(handle1,"fasta")
+record_iter = SeqIO.parse(handle1,infmt)
 
 outfiles = {}
 for line in handle2 :
@@ -74,7 +80,7 @@ for i, rec in enumerate(record_iter) :
         print "Alignments do not all have the same length."
         print "Either run without -a flag or check alignment file."
         sys.exit(1)
-    SeqIO.write(rec, outfiles[rec.id.split("_")[0]], "fasta")
+    SeqIO.write(rec, outfiles[rec.id.split("_")[0]], outfmt)
 
 for keys in outfiles:
     outfiles[keys].close()
