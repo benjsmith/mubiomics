@@ -1,0 +1,4 @@
+$ cat .gitignore
+
+#ignore all compiled python scripts (.pyc files)
+**/*.pyc
