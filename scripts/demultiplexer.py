@@ -438,7 +438,7 @@ doesn't match any that were entered. Run 'demultiplexer.py -h' for help."
                         max_trim_pos = epos+max_length
                     else:
                         max_trim_pos = None
-                    revseq = revseq[epos:max_trim_pos]
+                    revseq = revseq[epos-1:max_trim_pos]
                 #if no primer, it will leave the revseq unmodified and write it
                 except TypeError:
                     pass
