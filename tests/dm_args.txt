@@ -1,9 +1,11 @@
 -itestdata.qc.fastq
+-Ifastq
 -otestout.fasta
+-Ofasta
 -mtestmap.txt
+-d0
 -e1
 -T3
 -R4
--S
--B10000
+-s
 -v

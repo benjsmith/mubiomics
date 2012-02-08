@@ -45,14 +45,11 @@ in the databse are combined into a category called "Noise". It also
 allows setting of a minimum count threshold; if no sample contains more
 counts tnan this threshold, the OTU is discarded.
 
-- `sample_otu_plots.py` a python script which takes an OTU table and
-produces OTU richness plots and pie charts for each sample in the table.
-Currently not working properly, needs attention.
-
 For all included python scripts, type the name of the script followed by
 `-h` or `--help` to see help documentation.
 
-- shell scripts for splitting input and output to distribute processes over multiple cores.
+- shell scripts for splitting input and output to distribute processes over
+multiple cores (currently only suitable for the qc.py script).
 
 ## Installation:
 

@@ -25,7 +25,7 @@ parser.add_argument('-m', '--map_fp', required=True, nargs=1, type=str,
                     file with a sample name in the first column of each line.
                     The sample names in this file will be used as the column
                     headings in the output. Should contain both forward and
-                    reverse barcodes. If sample names in the mapping file
+                    reverse names. If sample names in the mapping file
                     end with '.F' or '.R', respectively, set the -s or
                     --split_on parameter to a period.''')
 parser.add_argument('-s', '--split_on', nargs=1, default=['.'], type=str,
@@ -35,6 +35,10 @@ parser.add_argument('-s', '--split_on', nargs=1, default=['.'], type=str,
 parser.add_argument('-n', '--noise', action='store_true',
                     help='''condense counts for all clusters that do not match
                     any database sequences into a group called "Noise".''')
+parser.add_argument('-p', '--paired_only', action='store_true',
+                    help='''only count taxa where reads from both directions
+                    agree. If left unset, reads without partner hits will also
+                    be counted.''')
 parser.add_argument('-v', '--verbose', action='store_true',
                     help='''activate verbose mode. Indicates progress and other
                     information.''')
@@ -102,7 +106,7 @@ separated by a space."
         #build list of species' IDs
         if separated[1] not in otus :
             otus.append(separated[1])
-        #build dict mapping read name to sample_ids index. Ued for flushing
+        #build dict mapping read name to sample_ids index. Used for flushing
         #reads dictionary
         read2sample[orig] = sample_ids.index(id[0])
         #build list of species' names
@@ -112,7 +116,7 @@ separated by a space."
         if line[0] == "H":
             tax_name = separated[9].rstrip("\n").split("/")[0]
         #if new seed, take penultimate column as taxon name
-        else:
+        elif line[0] == "S":
             tax_name = separated[8].split("/")[0]
         if tax_name not in taxon_names :
             taxon_names.append(tax_name)
@@ -141,11 +145,12 @@ if verbose:
     print "Flushing list of unpaired reads..."
 
 #parse the remaining reads, these will be singletons, and add their otu
-#indices to the list
-for k, v in reads.iteritems():
-    otu_indices.append([taxon_names.index(v)+1, \
-    read2sample[k]])#+1 because of header line in table
-reads={}
+#indices to the list, only if -p not specified.
+if not paired_only:
+    for k, v in reads.iteritems():
+        otu_indices.append([taxon_names.index(v)+1, \
+        read2sample[k]])#+1 because of header line in table
+    reads={}
 if verbose:
     print "Generating OTU table from hit counts..."
 

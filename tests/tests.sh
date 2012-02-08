@@ -28,15 +28,6 @@ testout.uc --id 0.89 --rev --iddef 2 --global
 ucstripper.py -i testout.uc -o table.txt -m testmap.txt
 
 #Optionally, pool OTUs with identical names and remove OTUs with less than a 
-#minimum number of counts in any sample.
-pool_otus.py table.txt pooled_table.txt -m 5 -r
+#minimum proprotion of counts in any sample.
+pool_otus.py table.txt pooled_table.txt -m 0.01 -r
 
-#Plot table of results as pie charts for each sample and plot OTU richness
-#curves.
-
-#The plotting script seems to be broken now for some reason, so I have 
-#commented it out. I have included two previous plots in the docs directory 
-#as examples of the output when it is working. Currently it attempts to plot
-#too many of plots.
-
-#./sample_otu_plots_v0.1.py pooled_table.txt plots/

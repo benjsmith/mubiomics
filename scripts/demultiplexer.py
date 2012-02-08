@@ -107,10 +107,12 @@ parser.add_argument('-n', '--start_numbering_at', nargs=1, default=[1], type=int
                     help='''set the start number for labeling assigned reads''')
 parser.add_argument('-u', '--use_indexdb', action='store_true',
                     help='''activate database indexing mode. This should be
-                    used if the mate file is larger than one fifth of the
-                    available RAM. It parses the entries in the mate file
+                    used if the combined size of the input files is larger than
+                    two thirds the available RAM. It parses the entries
                     and stores them in an SQL database file in the directory
-                    where the input sequences reside.''')
+                    where the input sequences reside. This reduces memory
+                    consumption, but also significantly reduces the speed of the
+                    run, especially on slow hard drives.''')
 parser.add_argument('-x', '--index_exists', action='store_true',
                     help='''activate this if sequences have already been indexed
                     and stored in an SQL database file by this script using
