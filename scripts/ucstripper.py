@@ -96,7 +96,7 @@ for i, line in enumerate(handle1) :
             if separated[9].rstrip("\n").split("/")[0] not in taxon_names :
                 taxon_names.append(separated[9].rstrip("\n").split("/")[0])
         #if new seed, take penultimate column as taxon name
-        else:
+        elif line[0] == "S":
             if separated[8].split("/")[0] not in taxon_names :
                 taxon_names.append(separated[8].split("/")[0])
         #create tuples of indices of OTU ID and corresponding sample name 

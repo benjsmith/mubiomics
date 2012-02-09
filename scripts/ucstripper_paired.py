@@ -52,6 +52,7 @@ mapfile = args.map_fp[0]
 split_on = args.split_on[0]
 verbose = args.verbose
 noise = args.noise
+paired_only = args.paired_only
 
 #open input/output handles
 handle1 = open(infile, "rb") # uclust output file handle
@@ -84,7 +85,7 @@ reads = {}
 read2sample = {}
 for i, line in enumerate(handle1) :
     #if hit
-    if line[0] == "H" :
+    if line[0] == "H" or line[0] =="S" :
         if verbose :#print line number to stdout
             sys.stdout.write(str(i))
             sys.stdout.flush()
