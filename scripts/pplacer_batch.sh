@@ -78,10 +78,10 @@ for INFILE in ${FILES[@]}; do
         wait
         pplacer -c "${REFPKG}" --out-dir "${DEDUPDIR}"  "${DEDUPDIR}"/${FILEID%.*}.deduped.fasta
         wait
-        guppy redup -d "${DEDUPDIR}"/${FILEID%.*}.dedup "${DEDUPDIR}"/${FILEID%.*}.deduped.json \
+        guppy redup -d "${DEDUPDIR}"/${FILEID%.*}.dedup "${DEDUPDIR}"/${FILEID%.*}.deduped.jplace \
         -o "${OUTDIR}"/${FILEID%.*}.json
         wait
-        rm "${DEDUPDIR}"/${FILEID%.*}.deduped.json
+        rm "${DEDUPDIR}"/${FILEID%.*}.deduped.jplace
         wait
         guppy fat -c "${REFPKG}" "${OUTDIR}"/${FILEID%.*}.json -o "${GPYOUTDIR}"/${FILEID%.*}.xml
         wait
