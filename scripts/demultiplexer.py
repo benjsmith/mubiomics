@@ -11,7 +11,7 @@ from Bio.Data import IUPACData
 import sys, os, re, argparse, resource
 from time import strftime
 from numpy import *
-from collections import deque
+from collections import deque, Counter
 
 #Add parent directory of current file to sys.path so imports can be made from folder
 sys.path.insert(0,os.path.dirname(os.path.dirname(sys.argv[0])))
@@ -32,7 +32,7 @@ parser = argparse.ArgumentParser(
     barcoded end read and will appear at the same position in the mated output
     file. WARNING: This can be very slow or use a large amount of
     memory, depending on which options you specify and on the sizes of your input
-    sequence files. If barcodes are on both ends, either run each file
+    sequence files. If barcodes are on both ends, run each file
     separately, as though demultiplexing for single end reads. If barcodes on
     each ends are different, you could also join the two sequence files and
     demultiplex it in one, using the mapping file to control naming of forward
@@ -56,14 +56,21 @@ parser.add_argument('-p', '--pair_fp', nargs='?', type=str,
                     with ".unassigned".''')
 parser.add_argument('-P', '--paired', action='store_true',
                     help='''activate paired-end mode.''')
-parser.add_argument('-d', '--direction_ids', required=True, nargs='+',
-                    type=int, help='''numbers in read names identifying
-                    direction of read. Thi is the last number after the
-                    "/" in the read names e.g.,usually single end runs use "/0",
-                    so you would specify "-d 0". If demultiplexing a
-                    paired-end run, enter two numbers separated by a space,
-                    e.g., if forward reads end in "/1" and reverse reads end
-                    in "/3", you would enter "-d 1 3"''')
+parser.add_argument('-H', '--hardware', required=True, nargs=1,
+                    help='''enter the sequencing hardware used. Options are
+                    '454', 'HiSeq', 'MiSeq'.''')
+#parser.add_argument('-d', '--direction_ids', required=False, nargs='+',
+#                    default='',
+#                    type=int, help='''enter numbers in read names identifying
+#                    direction of read. For Illumina HiSeq, this is the last
+#                    number after the "/" in the read names e.g.,usually single
+#                    end runs use "/0", so you would specify "-d 0".
+#                    If demultiplexing a paired-end run, enter two numbers
+#                    separated by a space, e.g., if forward reads end in "/1"
+#                    and reverse reads end in "/3", you would enter "-d 1 3".
+#                    For Illumina MiSeq, the read direction is the number
+#                    before the ":N" towards the end of the read name. For 454,
+#                    there is no need to set this parameter.''')
 parser.add_argument('-I', '--in_fmt', required=True, nargs=1, type=str,
                     help='''input file format (fasta or fastq)''')
 parser.add_argument('-O', '--out_fmt', required=True, nargs=1, type=str,
@@ -105,23 +112,24 @@ parser.add_argument('-R', '--right_pad', nargs=1, default=[0], type=int,
                     the target primer sequence.''')
 parser.add_argument('-n', '--start_numbering_at', nargs=1, default=[1], type=int,
                     help='''set the start number for labeling assigned reads''')
-parser.add_argument('-u', '--use_indexdb', action='store_true',
-                    help='''activate database indexing mode. This should be
-                    used if the combined size of the input files is larger than
-                    two thirds the available RAM. It parses the entries
-                    and stores them in an SQL database file in the directory
-                    where the input sequences reside. This reduces memory
-                    consumption, but also significantly reduces the speed of the
-                    run, especially on slow hard drives.''')
-parser.add_argument('-x', '--index_exists', action='store_true',
-                    help='''activate this if sequences have already been indexed
-                    and stored in an SQL database file by this script using
-                    index_db, or by another script using Biopython's
-                    SeqIO.index_db(...). If this is activated, make your input
-                    file (-i/--input_fp) the path to the database file, there
-                    is no need to activate -u/--use_indexdb in this case, but
-                    you should still specify the format of the sequences in the
-                    index file using the -I/--in_fmt option.''')
+#parser.add_argument('-u', '--use_indexdb', action='store_true',
+#                    help='''activate database indexing mode. This should be
+#                    used if the combined size of the input files on a paired run
+#                    is larger than two thirds the available RAM. It parses the
+#                    entries and stores them in an SQL database file in the directory
+#                    where the input sequences reside. This reduces memory
+#                    consumption, but also significantly reduces the speed of the
+#                    run, especially on slow hard drives. For single end runs, this
+#                   is never necessary.''')
+#parser.add_argument('-x', '--index_exists', action='store_true',
+#                    help='''activate this if sequences have already been indexed
+#                    and stored in an SQL database file by this script using
+#                    index_db, or by another script using Biopython's
+#                    SeqIO.index_db(...). If this is activated, make your input
+#                    file (-i/--input_fp) the path to the database file, there
+#                    is no need to activate -u/--use_indexdb in this case, but
+#                    you should still specify the format of the sequences in the
+#                    index file using the -I/--in_fmt option.''')
 parser.add_argument('-s', '--suppress_unassigned', action='store_true',
                     help='''activate this mode to stop unassigned sequences
                     being written. This can save space if you don't care about
@@ -135,16 +143,15 @@ infile = args.input_fp[0]
 infmt = args.in_fmt[0]
 pairfile = args.pair_fp
 paired = args.paired
-dir_ids = args.direction_ids
+#dir_ids = args.direction_ids
+hardware=args.hardware[0]
 outfmt = args.out_fmt[0]
 outfile = args.output_fp[0]
-
+max_length = args.max_length[0]
+barcode_type = args.barcode_type[0]
 # tab-delimited meta-data file
 mapfile = args.map_fp[0]
 
-#Setting parameters from commmand line arguments.
-max_length = args.max_length[0]
-barcode_type = args.barcode_type[0]
 try :
     barcode_length = int(barcode_type)
 except ValueError :
@@ -157,12 +164,29 @@ max_bc_mismatch = args.max_barcode_errors[0]
 max_prim_mismatch = args.max_primer_mismatch[0] 
 max_bc_st_pos = args.max_bc_start_pos[0]
 right_padding = args.right_pad[0]
-use_indexdb = args.use_indexdb
-idx_exists = args.index_exists
+#use_indexdb = args.use_indexdb
+#idx_exists = args.index_exists
 suppress = args.suppress_unassigned
 verbose = args.verbose
 
-#open required filehandles dependent on parameters specified
+# Set behaviour for determinig read ids and read direction from
+# hardware and dir_ids parameters.
+if hardware == "454":
+    split_on = ''
+    rn_part = 0
+elif hardware == "HiSeq":
+    split_on = '/'
+    rn_part = 0
+elif hardware == "MiSeq":
+    split_on = ' '
+    rn_part = 0
+else:
+    print "Unknown sequencing hardware specified (-H, --hardware, parameter)."
+    print "Run demultiplexer.py -h for help"
+    sys.exit(1)
+
+
+# Open required filehandles dependent on parameters specified
 
 try :
     outhandle = open(outfile, "wb")
@@ -187,65 +211,140 @@ if not suppress:
 
 if verbose :
     print "\nDemultiplexing run started " + strftime("%Y-%m-%d %H:%M:%S") + "."
-    print "Building list of readnames to process " + \
+    if paired:
+        print "Building list of readnames to process " + \
 strftime("%Y-%m-%d %H:%M:%S") + "..."
-#make set of sequence base names that are in both files by stripping directional
-#identifier
-readnames1 = deque([])
-readnames2 = deque([])
-for i, n in enumerate(SeqIO.parse(infile, infmt)):
-    if verbose:
-        sys.stdout.write("File 1, Read: " + str(i+1))
-        sys.stdout.flush()
-        sys.stdout.write("\b"*len("File 1, Read: " + str(i+1)))
-    seqname1 = n.id.split("/")[0]
-    readnames1.append(seqname1)
-readnames = set(readnames1)
-readnames1.clear()
-print ""
+
+def idx(myitem, mylist):
+    '''Index function that returns None when item is not present.
+    
+    '''
+    try:
+        return mylist.index(myitem)
+    except ValueError:
+        return None
+
+## New Approach ##
+firstiter = SeqIO.parse(infile, infmt)
 if paired:
-    for j, m in enumerate(SeqIO.parse(pairfile, infmt)):
-        if verbose:
-            sys.stdout.write("File 2, Read: " + str(j+1))
-            sys.stdout.flush()
-            sys.stdout.write("\b"*len("File 2, Read: " + str(j+1)))
-        seqname2 = m.id.split("/")[0]
-        readnames2.append(seqname2)
-    readnames.union(readnames2)
-    readnames2.clear()
-if verbose:
-    print ""
-    print "Built " + strftime("%Y-%m-%d %H:%M:%S") + "."
-
-if not idx_exists:
-    #if specified not to use an existing index file, either create one,
-    #removing any old one of the same name, first, or index in memory.
+    firstreadnames = map(lambda seq: seq.description.split(split_on)[rn_part],
+                     firstiter)
+    mateiter = SeqIO.parse(infile, infmt)
+    matereadnames = map(lambda seq: seq.description.split(split_on)[rn_part],
+                        mateiter)
     if verbose:
-        print "Indexing input sequence files..."
-    #index sequence input files
-    if use_indexdb:
-        indexfile = str(os.path.splitext(os.path.abspath(infile))[0]) + ".idx"
-        try:
-            os.remove(indexfile)
-        except OSError:
-            pass
-        if paired:
-            indata = SeqIO.index_db(indexfile, [infile, pairfile], infmt)
-        else:
-            indata = SeqIO.index_db(indexfile, infile, infmt)
-    else:
-        if paired:
-            initindata = SeqIO.index(infile, infmt)
-            pairdata = SeqIO.index(pairfile, infmt)
-            indata = MultiIndexDict(initindata, pairdata)
-        else:
-            indata = SeqIO.index(infile, infmt)
-#elif idx_exists and in_mem:
-#    indata = SeqIO.index_db(":memory:", infile)
-else:
-    indata = SeqIO.index_db(infile)
+        print "Built " + strftime("%Y-%m-%d %H:%M:%S") + "."
+        print "Getting positions " + strftime("%Y-%m-%d %H:%M:%S") + "..."
+    ##position generators
+    #posmateinfirst = (idx(name, firstreadnames) for name in matereadnames)
+    #posfirstinmate = (idx(name, matereadnames) for name in firstreadnames)
+    # position lists generated by map
+    posmateinfirst = map((lambda name: idx(name, firstreadnames)), matereadnames)
+    if verbose:
+        print "First set of positions obtained " + \
+strftime("%Y-%m-%d %H:%M:%S") + "." 
+    posfirstinmate = map((lambda name: idx(name, matereadnames)), firstreadnames)
+    #clear readname lists if using position lists
+    firstreadnames=[]
+    matereadnames=[]
+    if verbose:
+        print "All positions obtained " + \
+strftime("%Y-%m-%d %H:%M:%S") + "." 
+    
 
+    
+        
+#if paired:
+#    #make set of sequence base names that are in both files by stripping directional
+#    #identifier
+#    readnames  = []
+#    rnappend=readnames.append
+#    dir_ids = []
+#    for i, n in enumerate(SeqIO.parse(infile, infmt)):
+#        if verbose:
+#            sys.stdout.write("File 1, Read: " + str(i+1))
+#            sys.stdout.flush()
+#            sys.stdout.write("\b"*len("File 1, Read: " + str(i+1)))
+#        seqname1 = n.description.split(split_on)[rn_part]
+#        #readnames1.append(seqname1)
+#        rnappend(seqname1)
+#        # In case there are more characters after the read number e.g. for MiSeq,
+#        # extract and store them to build up the list of read direction ids.
+#        ending = split_on.join(n.description.split(split_on)[rn_part+1:])
+#        if ending not in dir_ids:
+#            dir_ids.append(ending)
+#    print ""
+#    for j, m in enumerate(SeqIO.parse(pairfile, infmt)):
+#        if verbose:
+#            sys.stdout.write("File 2, Read: " + str(j+1))
+#            sys.stdout.flush()
+#            sys.stdout.write("\b"*len("File 2, Read: " + str(j+1)))
+#        seqname2 = m.description.split(split_on)[rn_part]
+#        rnappend(seqname2)
+#        ending = split_on.join(m.description.split(split_on)[rn_part+1:])
+#        if ending not in dir_ids:
+#            dir_ids.append(ending)
+#    # For index(_db), we need to define a function to create paired sets of
+#    # dict keys since these methods only take the id, which needs to be
+#    # supplemented with read direction information. For e.g. MiSeq
+#    # sequence files, the id doesn't contain any info about the read
+#    # direction, however, we can get this from the dir_ids we stored earlier.
+#    readCtr=Counter(readnames) #used in makeid function
+#    readnames=readCtr.keys() #used in makeid function
+#    midx=readnames.index # define function so it's not revaluated on each
+#    # makeid call during sequence indexing.
+#    def makeid(name, idx_fn=midx, dir_ids=dir_ids): # make local variables for speed.
+#        pos=idx_fn(name) # idx_fn defined after readnames is built
+#        cnt=readCtr[name]
+#        val=logiclist[pos]
+#        if cnt==2:
+#            if val==0:
+#                logiclist[pos]=1
+#            else:
+#                logiclist[pos]=0
+#        id = split_on.join([name, dir_ids[val]])
+#        return id
+#    
+#    if verbose:
+#        print ""
+#        print "Built " + strftime("%Y-%m-%d %H:%M:%S") + "."
+#    # Make logiclist form makeid function
+#    logiclist=[0]*len(readnames)    
+#    if not idx_exists:
+#    #if paired, index sequences
+#        if verbose:
+#            print "Indexing input sequence files..."
+#        # index sequence input files using SQL database, creating
+#        # new index file.
+#        indexfile = str(os.path.splitext(os.path.abspath(infile))[0]) + ".idx"
+#        try:
+#            os.remove(indexfile)
+#        except OSError:
+#            pass
+#    # index sequences using SQL db or in memory
+#    if use_indexdb:
+#        indata = SeqIO.index_db(indexfile, [infile, pairfile], infmt,
+#                                key_function=makeid)
+#    else:
+#        initindata = SeqIO.index(infile, infmt,
+#                                 key_function=makeid)
+#        pairdata = SeqIO.index(pairfile, infmt,
+#                               key_function=makeid)
+#        indata = MultiIndexDict(initindata, pairdata)
+##elif idx_exists and in_mem:
+#    #    indata = SeqIO.index_db(":memory:", infile)
+#    #else: #if index SQL db already exists, read it in.
+#    #    # Make logiclist for makeid function.
+#    #    logiclist=[0]*len(readnames)
+#    #    indata = SeqIO.index_db(infile, key_function=makeid)
+## if not paired, will parse the file on the fly further down the script.
 
+if verbose:
+    print "Parsing mapping file " + \
+strftime("%Y-%m-%d %H:%M:%S") + "..." 
+#logiclist=[0]*len(readnames) #Reset logiclist so seq index __getitem_ calls
+# later on are correctly synchronized to the number of ends each read has.
+# The __getitem__ method calls the key_function, makeid
 bcs = {} #Initialize bcs dictionary. Will have barcode as keyword 
 #and position in list as value
 ids = [] #Initialize list of sample IDs
@@ -264,7 +363,7 @@ for line in maphandle :
         except IndexError:
             pass
         if paired:
-            #test for presence of data in this column
+            #test for presence of data in the expected primer column
             try:
                 #test that data is an ambiguous DNA sequence
                 for nuc in separated[3]:
@@ -284,7 +383,8 @@ try :
 except IndexError:
     print "No data loaded from mapping file. Check and try again."
     sys.exit(1)
-
+if verbose:
+    print "Parsed " + strftime("%Y-%m-%d %H:%M:%S") + "." 
 #construct radix trie containing (mismatched) barcodes for efficient
 #storage and searching
 if verbose:
@@ -300,7 +400,6 @@ if verbose:
 # count_s = count of singleton reads, i.e., those that were assigned but had no mates
 # count_pm = sequences with primer mismatches, including unassigned that were rejected for too many primer mismatches
 
-
 id_counts = zeros( (len(ids), 2), dtype=object)
 for i, id in enumerate(ids) :
     id_counts[i, 0] = id
@@ -312,37 +411,131 @@ count_s = 0
 count_pm = 0
 
 if verbose:
-    print "Running..."
-#run main loop to assign id and trim.
+    print "Demultiplexing..."
+# 
 r = 0
-while readnames:
-    recname = readnames.pop()
-    try :
-        #if single-end, will definitely match a record in indata
-        #if paired-end, the selected record may have the other dir_id
-        record = indata["/".join([recname, str(dir_ids[0])])]
-        if paired:
+readname_pos=0
+#if not paired:
+#    readnames = SeqIO.parse(infile, infmt)
+#while readnames:
+#    if paired:
+#        try: #try to take first element of readnames
+#            recname = readnames[readname_pos]
+#        except IndexError: #if it is exhausted, break.
+#            break
+#        try :
+#            #if paired-end, the selected record may have the other dir_id
+#            record = indata[split_on.join([recname, str(dir_ids[0])])]
+#            try:
+#                #print split_on.join([recname, str(dir_ids[1])])
+#                materecord = indata[split_on.join([recname, str(dir_ids[1])])]
+#            except KeyError:
+#                materecord = None
+#                #mate pair is absent
+#        except KeyError:
+#            try:
+#                #if get here, the mate pair is absent
+#                record = indata[split_on.join([recname, str(dir_ids[1])])]
+#                materecord = None
+#            except KeyError:
+#                #if get here, wrong read direction identifiers were entered.
+#                print "Read direction identifiers in reads (-d/--direction_ids) \
+#don't match any that were entered. Run 'demultiplexer.py -h' for help."
+#                sys.exit(1)
+#        readname_pos+=1
+#    else:
+#        try:
+#            record = readnames.next()
+#        except StopIteration:
+#            break
+#    # A record is always assigned successfully
+    
+## New Approach ##
+end1=False
+end2=False
+pos1=None
+pos2=None
+pos2_idx=0
+while True:
+    if paired:
+        # Get positions.
+        if pos1>pos2_idx:
+            pos2=pos2
             try:
-                materecord = indata["/".join([recname, str(dir_ids[1])])]
-            except KeyError:
+                pos1=posfirstinmate.pop()
+            except StopIteration or IndexError:
+                end1=True
+                pass
+        elif pos1<pos2_idx:
+            pos1=pos1
+            try:
+                pos2=posmateinfirst.pop()
+            except StopIteration or IndexError:
+                end2=True
+                pass
+        elif pos1==pos2_idx:
+            try:
+                pos1=posfirstinmate.pop()
+            except StopIteration or IndexError:
+                end1=True
+                pass
+            try:
+                pos2=posmateinfirst.pop()
+            except StopIteration or IndexError:
+                end2=True
+                pass
+        if end1 and end2:
+            break
+        pos2_idx+=1
+        if not pos1 and not pos2:
+            continue
+        elif pos1 and not pos2:
+            try:    
+                record = firstiter.next()
                 materecord = None
-                #mate pair is absent
-    except KeyError:
-        try:
-            #if get here, the mate pair is absent
-            record = indata["/".join([recname, str(dir_ids[1])])]
-            materecord = None
-        except KeyError:
-            #if get here, wrong read direction identifiers were entered.
-            print "Read direction identifier (-d/--direction_ids) \
-doesn't match any that were entered. Run 'demultiplexer.py -h' for help."
+            except StopIteration or IndexError:
+                break
+        elif pos2 and not pos1:
+            try:    
+                record = mateiter.next()
+                materecord = None
+            except StopIteration or IndexError:
+                break
+        elif pos1 and pos2:
+            if pos1==pos2:
+                try:    
+                    record = firstiter.next()
+                    materecord = mateiter.next()
+                except StopIteration or IndexError:
+                    break
+            elif pos1>pos2:
+                try:    
+                    record = firstiter.next()
+                    materecord = None
+                except StopIteration or IndexError:
+                    break
+            elif pos1<pos2:
+                try:    
+                    record = mateiter.next()
+                    materecord = None
+                except StopIteration or IndexError:
+                    break
+            
+        else:
+            print "Paired run exited because position lists were exhausted."
             sys.exit(1)
-    #correct to here, a record is always assigned successfully
+    else:
+        try:
+            record = firstiter.pop()
+        except StopIteration or IndexError:
+            break
+        
     #########################
-    #attempt to identify sequence stored in "record"
+    # Attempt to identify sequence stored in "record"
     result = identify_read(bc_trie, record, bcs, ids, primers, \
             max_pos=max_bc_st_pos, max_p_mismatch=max_prim_mismatch, \
-            rpad=right_padding, bc_len=barcode_length, bc_type=barcode_type) 
+            rpad=right_padding, bc_len=barcode_length, bc_type=barcode_type)
+    #print materecord
     if result[1] != "Unassigned" :#if a sample ID was assigned:
         if max_length:#set position of last nucleotide in read, based on
             #max_length parameter, if set.

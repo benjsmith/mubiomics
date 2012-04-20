@@ -29,6 +29,11 @@ class MultiIndexDict:
             except KeyError:
                 pass
         raise KeyError("{0} not found".format(key))
+    def __len__(self):
+        length=0
+        for idx in self._indexes:
+            length=len(idx)+length
+        return length
 
         
     
