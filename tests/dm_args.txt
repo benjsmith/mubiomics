@@ -3,9 +3,9 @@
 -otestout.fasta
 -Ofasta
 -mtestmap.txt
--d0
 -e1
 -T3
 -R4
+-HHiSeq
 -s
 -v
