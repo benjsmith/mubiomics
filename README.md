@@ -1,8 +1,6 @@
 Software for Massively-Parallel Next-Generation Sequencing Data
 ================================================================
 
-Author: Benjamin C. Smith, 2011
-
 Description:
 ============
 
@@ -12,7 +10,7 @@ A combination of generally useful scripts and those specific to microbiome
 analysis.
 
 Code is currently pre-publication and in development, but mostly works. Please cite us if you use it
-([email](mailto:benjamin.smith@einstein.yu.edu) for citation information)
+([email](mailto:benjamincharlessmith@gmail.com) for citation information)
 
 The mubiomics package is licensed under [GNU GPLv3](http://www.gnu.org/licenses/gpl.html). 
 
@@ -66,8 +64,12 @@ is not located, that end will not be trimmed.
 
 * `separate_assigned_reads.py` will take a FASTA or FASTQ file that has been
 demultiplexed and create a folder of files containing the sample-specific sequences,
-one for each of the samples in the mapping file (the same mapping file used for `demultiplexer.py`). This step is essential for using `pplacer` to place reads from multiple samples.
+one for each of the samples in the mapping file (the same mapping file used for `demultiplexer.py`).
+This step is essential for using `pplacer` to place reads from multiple samples.
 
+* `seqparser.py` provides several sequence manipulation functions, including
+conversion between file formats (e.g.,from FASTA + QUAL files to FASTQ files),
+compliment, reverse compliment and reverse.
 
 ### Useful for usearch-based microbiome pipeline:
 
@@ -88,8 +90,6 @@ if only one end is present in the .uc file, its OTU is counted.
 user-specified taxonomic level. It requires specifically formatted mapping and
 taxonomy files. The format for these files should match that used in `taxtastic`
 databases.
-
-* `fasta2fastq.py` converts FASTA + QUAL files to FASTQ files.
 
 
 ###Useful for RDP-based microbiome pipeline:
@@ -145,9 +145,9 @@ you how many reads were assigned to each sample.
 Installation:
 -------------
 
-Two directories are available for download, `mubiomics.zip` and `mubiomics_no_test_data.zip`. The latter doesn't include the test data so is smaller. If you wish to run the tests at some later point, the `testdata.fastq` is also available to download. This should be placed in the "tests" directory, within the "mubiomics" directory.
-
-To install, place the mubiomics directory anywhere on your hard drive, add it to the $PYTHONPATH shell variable and add the mubiomics/scripts directory to your $PATH variable.
+To install, place the mubiomics directory anywhere on your hard drive, add it to
+the $PYTHONPATH shell variable and add the mubiomics/scripts directory to your
+$PATH variable.
 
 The following prerequisites must be installed for scripts to work:
 -Python v2.7 or greater
@@ -186,19 +186,27 @@ in `~/.bash_profile`:
     export PATH=${PATH}:/path/to/directory
     export PYTHONPATH=${PYTHONPATH}:/path/to/directory
 
-The `tests.sh` script also provides an example workflow. Open it in a text editor for explanations of each step.
+The `tests.sh` script also provides an example workflow. Open it in a text editor
+for explanations of each step.
 
 
 QIIME compatibility:
 --------------------
 
-The programs in this package were intially written so that they provided compatibility with [QIIME](http://qiime.sourceforge.net/), which, at the time, couldn't demultiplex FASTQ data from the Hi-Seq platform. Output from demultiplexer.py is thus compatible with all downstream QIIME workflows.
-Output from ucstripper.py and pool\_otus.py are an identical format to
+The programs in this package were intially written so that they provided compatibility
+with [QIIME](http://qiime.sourceforge.net/), which, at the time, couldn't demultiplex
+FASTQ data from the Hi-Seq platform. Output from `demultiplexer.py` is thus compatible with
+all downstream QIIME workflows.
+Output from `ucstripper.py` and `pool_otus.py` are an identical format to
 the OTU tables produced by QIIME and thus compatible with the analysis scripts that take them as input.
 
 Notes:
 ------
 
-Development and testing was performed on Mac OSX 10.6 using Python v2.7, numpy v1.5.1, maplotlib v1.0.1, Biopython v1.5.8. We can't guarantee that it will work with other setups, but feel free to [email](mailto:benjamin.smith@einstein.yu.edu) with any issues.
+Development and testing was performed on Mac OSX 10.6 using Python v2.7, numpy v1.5.1,
+maplotlib v1.0.1, Biopython v1.5.8. We can't guarantee that it will work with other setups,
+but feel free to [email](mailto:benjamincharlessmith@gmail.com) with any issues.
 
-The patricia.py class was obtained from a [post on stack overflow](http://stackoverflow.com/questions/2406416/implementing-a-patricia-trie-for-use-as-a-dictionary/2412468#2412468). Thank you to John Peel for posting this, we hope you don't mind us using it!
+The patricia.py class was obtained from a
+[post on stack overflow](http://stackoverflow.com/questions/2406416/implementing-a-patricia-trie-for-use-as-a-dictionary/2412468#2412468).
+Thank you to John Peel for posting this, we hope you don't mind us using it!

@@ -1,5 +1,5 @@
 -itestdata.fastq
--otestdata.qc.fastq
+-oqc/testdata.qc.fastq
 -Ofastq
 -l80
 -v

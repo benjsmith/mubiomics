@@ -1,6 +1,6 @@
--itestdata.qc.fastq
+-iqc/testdata.qc.fastq
 -Ifastq
--otestout.fasta
+-oqc/testout.dmx.fasta
 -Ofasta
 -mtestmap.txt
 -e1

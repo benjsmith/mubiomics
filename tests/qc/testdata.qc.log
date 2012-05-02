@@ -1,0 +1,18 @@
+Logfile for quality control filtering of testdata.fastq
+2012-05-02 16:35:22
+
+Parameters specified:
+Minimum nucleotide quality score: 15
+Window size to check for minimum score: 10
+Lowest acceptable average read quality score (after trimming bad bases): 25
+Nucleotides to trim from front of each read: 0
+Minimum sequence length: 80
+Maximum sequence length: None
+
+Counts:
+Total high quality reads written: 28851
+Total poor quality reads ignored: 121149
+Mean of mean QCed read quality: 29.5262421216
+Standard deviation of mean QCed read quality: 2.43880223406
+Mean QCed read length: 102
+Standard deviation of QCed read length: 12.0415945788

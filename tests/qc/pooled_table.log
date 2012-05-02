@@ -1,0 +1,9 @@
+Logfile for OTU pooling of qc/table.txt
+2012-05-02 16:36:39
+
+Parameters specified:
+Minimum read threshold: 0.01
+Counts:
+Total reads in input OTU table: 15029
+Total reads in output OTU table: 14467
+Reads discarded by setting minimum threshold to 1.0 %: 562

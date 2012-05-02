@@ -24,22 +24,21 @@ from itertools import product
 from time import strftime
 
 
-parser = argparse.ArgumentParser(description='''Filter an OTU table by
-pooling OTUs with identical names. (Optionally: discard OTUs with
-less than a specified minimum proportion of counts in any one sample)''')
+parser = argparse.ArgumentParser(description='''Filter an OTU table by pooling
+OTUs with identical names. (Optionally: discard OTUs with less than a specified
+minimum proportion of counts in any one sample)''')
 parser.add_argument('-i','--infile', required=True, nargs=1,
-                    type=str, help='''input filepath. Should be a tab-delimited
-                    OTU table.''')
+		    type=str, help='''input filepath. Should be a tab-delimited
+		    OTU table.''')
 parser.add_argument('-o', '--outfile', required=True, nargs=1, type=str,
 		    help='''output filepath. The resulting pooled OTU table is
-                    written here.''')
+		    written here.''')
 parser.add_argument('-m', '--min', nargs=1, default=[0], type=float,
-                    help='''set the lowest acceptable read proportion 
-		    e.g. 0.01 will keep all reads that comprise more than 1 percent of
-		    a sample's composition and set any below 1 percent to 0.
-		    Any rows (OTUs) that conatin all 0s after filtering will be
-		    discarded.
-		    ''')
+		    help='''set the lowest acceptable read proportion e.g. 0.01
+		    will keep all reads that comprise more than 1 percent of a
+		    sample's composition and set any below 1 percent to 0. Any
+		    rows (OTUs) that conatin all 0s after filtering will be
+		    discarded. ''')
 parser.add_argument('-r', '--reads', action='store_true', 
                     help='''print information about number of reads''')
 args = parser.parse_args()
@@ -74,12 +73,12 @@ inhandle.next()# skip first line
 inhandle.next()#skip second line
 for line in inhandle :
     if line[-1] not in otu_names :
-        otu_names.append(line[-1])
-        # K,V = name of taxon, list of number of occurrences in each sample
+	otu_names.append(line[-1])
+	# K,V = name of taxon, list of number of occurrences in each sample
 	#there may be more than one V for each K.
-        otu_dict[line[-1]] = [line[1:-1]]
+	otu_dict[line[-1]] = [line[1:-1]]
     else :
-        otu_dict[line[-1]].append(line[1:-1])
+	otu_dict[line[-1]].append(line[1:-1])
 
 #create array of total counts per sample by summing along columns
 total_counts_per_otu=array([item for sublist in otu_dict.values() \

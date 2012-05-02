@@ -260,6 +260,11 @@ if paired:
     if verbose:
         print "Built " + strftime("%Y-%m-%d %H:%M:%S") + "."
         print str(nmax) + " mated and singleton reads to process."
+else:
+    #get number of reads to process
+    nmax=len([seq for seq in firstiter])
+    #reinitialize generator (it will have been consumed in previous step)
+    firstiter=SeqIO.parse(infile, infmt)
         
 # Extract information from the mapping file.
 if verbose:
@@ -337,7 +342,8 @@ if verbose:
     print "Demultiplexing..."
 # Beginning of run, if so, get first two position values.
 seq1 = firstiter.next()
-seq2 = mateiter.next()
+if paired:
+    seq2 = mateiter.next()
 # Run identification loop.
 for i in range(0,nmax):
     if paired:

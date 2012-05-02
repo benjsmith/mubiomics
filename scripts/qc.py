@@ -67,9 +67,9 @@ parser.add_argument('-L', '--max_length', nargs=1, default=[None], type=int,
                     help='''set the sequence length that should be returned
                     (i.e., after trimminmg barcodes, primers and
                     any padding).''')
-parser.add_argument('-B', '--out_buffer', nargs=1, default=[4000], type=int,
-                    help='''set the maximum number of reads to hold in memory
-                    between write operations.''')
+#parser.add_argument('-B', '--out_buffer', nargs=1, default=[4000], type=int,
+#                    help='''set the maximum number of reads to hold in memory
+#                    between write operations.''')
 parser.add_argument('-v', '--verbose', action='store_true',
                     help='''activate verbose mode. Indicates progress and other
                     information.''')
@@ -85,7 +85,6 @@ left_trimming = args.left_trim[0]
 min_length = args.min_length[0]
 max_length = args.max_length[0]
 win_size = args.win_size[0]
-buffer_size = args.out_buffer[0]
 verbose = args.verbose
 
 
@@ -114,7 +113,6 @@ sum_x = 0# running sum of mean read quality
 sum_x_sq = 0#running sum of squared mean read quality
 sum_l = 0#running sum of mean quality controlled read length
 sum_l_sq = 0#running sum of squared mean quality controlled read length
-output_buffer = []
 
 #run main loop to quailty filter, assign id and trim. q_c from demultiplex
 for record in quality_control(record_iter, n_trim=left_trimming,  \
@@ -122,14 +120,8 @@ for record in quality_control(record_iter, n_trim=left_trimming,  \
                               , min_len=min_length, win=win_size) :
     if record:
         record = record[:max_length]
-        output_buffer.append(record)
+        SeqIO.write(record, handle2, outfmt)
         count += 1 #increment counter for good reads
-        # write all reads if buffer is full.
-        if count % buffer_size == 0 :
-            # write only longer list
-            for i in output_buffer:
-                SeqIO.write(i, handle2, outfmt)
-            output_buffer = []#reset buffer
         x = mean(record.letter_annotations["phred_quality"])
         l = len(record)
         sum_x += x
@@ -145,11 +137,6 @@ for record in quality_control(record_iter, n_trim=left_trimming,  \
         sys.stdout.flush()
         sys.stdout.write("\b"*len("Good reads: " + str(count) + \
                                   ", Bad reads: " + str(count_bad)))
-
-# final buffer clear        
-for i in output_buffer:
-    SeqIO.write(i, handle2, outfmt)
-output_buffer = []
 
 handle1.close()
 handle2.close()

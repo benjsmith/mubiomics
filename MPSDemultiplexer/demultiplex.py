@@ -29,7 +29,7 @@ from numpy import *
 import re, sys
 
 class MultiIndexDict:
-    """Thanks to Brad Chapman for posting this answer on Stack Overflow
+    """Thanks to Brad Chapman for posting this answer on StackOverflow.com
     
     @usage: indata = SeqIO.index("f001", "fasta")
             pairdata = SeqIO.index("f002", "fasta")
@@ -38,6 +38,8 @@ class MultiIndexDict:
             print combo['gi|3318709|pdb|1A91|'].description
             print combo['gi|1348917|gb|G26685|G26685'].description
             print combo["key_failure"]
+            
+    *Deprecated, no longer in use.*
     """
     def __init__(self, *indexes):
         self._indexes = indexes

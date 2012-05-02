@@ -67,7 +67,8 @@ handle1 = open(infile, "rU") # uclust output file handle
 handle2 = open(outfile, "wb") # output text file handle
 handle3 = open(mapfile, 'rU') #mapping file handle
 
-print "Running..."
+if verbose:
+    print "Running..."
 
 handle2.write("#ucstripper OTU Table\n") # add header line to outout file
 
@@ -79,7 +80,7 @@ for line in handle3 :
         id = line.split()[0].split(split_on)[0]
         if id not in sample_ids:
             sample_ids.append(id)
-sample_ids.append("Consensus Lineage")
+sample_ids.append('Consensus Lineage')
 
 if verbose:
     print "Processing reads for " + str(len(sample_ids)-2) + " samples."
@@ -138,7 +139,7 @@ for i, otu in enumerate(otus) :
 #store OTU names
 for i, tax_name in enumerate(taxon_names) :
     otu_table[i+1, -1] = tax_name
-
+    
 
 #Check whether a "Noise" row should be created
 if noise:
@@ -169,8 +170,11 @@ if noise:
     temp_table = None
 else: #If no noise row required, use table currently stored in otu_table
     curated_otu_table = otu_table
+if verbose:
+    print "Writing data"
 savetxt(handle2, curated_otu_table, fmt='%s', delimiter='\t')    
-print "Finished."
+if verbose:
+    print "Finished."
 handle1.close()
 handle2.close()
 handle3.close()
