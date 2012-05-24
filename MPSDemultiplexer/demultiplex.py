@@ -55,10 +55,9 @@ class MultiIndexDict:
         for idx in self._indexes:
             length=len(idx)+length
         return length
-
-        
     
-def quality_control(entry, av_score=40, min_score=10, \
+    
+def quality_control(rec, min_score=28, \
     n_trim=0, min_len=80, win=10):
     """Generator function to trim FASTQ files according to quality criteria.
 
@@ -74,36 +73,18 @@ def quality_control(entry, av_score=40, min_score=10, \
        min_score=15, n_trim=3, min_len=100, win=50]):
            print record.format("fasta").rstrip("\n")
     """
-    for i, rec in enumerate(entry) :
-        #get the list of basecall scores
-        qual_list = rec[n_trim:].letter_annotations["phred_quality"]
-        #scan through the list so that the end of the final window corresponds
-        #to the last nucleotide in the read
-        for j in arange(len(qual_list) - win):
-            #test whether average score of window falls below minimum allowed
-            #score
-            if mean(qual_list[j:j+win]) < min_score :
-                break
-        #Test if window made it to end of list (has to be -1 because counting
-        #in the for loop that sets j starts at zero)
-        if j != len(qual_list)-win-1:
-            # if not, return only the sequence before the failed window
-            #providing it's longer than the min. length and has an average
-            #score greater than the min. average score.
-            if len(rec[n_trim:j]) >= min_len and \
-            mean(rec[n_trim:j].letter_annotations["phred_quality"]) >= \
-            av_score :
-                yield rec[n_trim:j]
-            else: 
-                yield None
-        else : #if the window made it to the end of the list without failing
-            # return the entire sequence
-            if len(rec[n_trim:]) >= min_len and \
-            mean(rec[n_trim:].letter_annotations["phred_quality"]) >= \
-            av_score :
-                yield rec[n_trim:]
-            else:
-                yield None
+    try:
+    #get the 3' cut position
+        cut3 = max(j for j in arange(len(rec)-win) if
+                mean(rec[n_trim+j:n_trim+j+win].letter_annotations["phred_quality"])\
+                >=min_score)
+    except ValueError:
+        yield None
+    #test that the average score
+    if len(rec[n_trim:cut3]) >= min_len:
+        yield rec[n_trim:cut3]
+    else:
+        yield None
 
 def mmDNAtrie(seqs, mismatches):
     """Creates a dictionaried patricia tree of seqs with mismatches.

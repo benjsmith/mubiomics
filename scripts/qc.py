@@ -43,15 +43,15 @@ parser.add_argument('-o', '--output_fp', required=True, nargs=1, type=str,
                     help='''output filepath.''')
 parser.add_argument('-O', '--out_fmt', required=True, nargs=1, type=str,
                     help='''output file format (fasta or fastq)''')
-parser.add_argument('-s', '--min_av_score', nargs=1, default=[25], type=int,
-                    help='''set the minimum average read score for a read to be
-                    accepted.''')
-parser.add_argument('-t', '--min_nt_score', nargs=1, default=[15], type=int,
+#parser.add_argument('-s', '--min_av_score', nargs=1, default=[25], type=int,
+#                    help='''set the minimum average read score for a read to be
+#                    accepted.''')
+parser.add_argument('-t', '--min_nt_score', nargs=1, default=[28], type=int,
 		    help='''set the minimum basecall score. When the average
 		    score of nucleotides in a window (whose size is set with
 		    the -w/--win_size parameter) drops below this value, the
 		    read is truncated at the beginning of the window (i.e.,
-		    subsequent nucleotides discarded).''')
+		    subsequent nucleotides are discarded).''')
 parser.add_argument('-w', '--win_size', nargs=1, default=[10], type=int,
 		    help='''set the window size for determining sequence
 		    truncation. A moving window scans along each read, advancing
@@ -79,7 +79,7 @@ infile = args.input_fp[0]
 outfile = args.output_fp[0]
 outfmt = str(args.out_fmt[0])
 #Setting parameters from commmand line arguments.
-average_score = args.min_av_score[0]
+#average_score = args.min_av_score[0]
 minimum_score = args.min_nt_score[0]
 left_trimming = args.left_trim[0]
 min_length = args.min_length[0]
@@ -114,20 +114,22 @@ sum_x_sq = 0#running sum of squared mean read quality
 sum_l = 0#running sum of mean quality controlled read length
 sum_l_sq = 0#running sum of squared mean quality controlled read length
 
+
 #run main loop to quailty filter, assign id and trim. q_c from demultiplex
-for record in quality_control(record_iter, n_trim=left_trimming,  \
-                              av_score=average_score, min_score=minimum_score \
-                              , min_len=min_length, win=win_size) :
+for entry in record_iter:
+    record = quality_control(entry, n_trim=left_trimming,  \
+                            min_score=minimum_score, \
+                            min_len=min_length, win=win_size).next()
     if record:
         record = record[:max_length]
         SeqIO.write(record, handle2, outfmt)
         count += 1 #increment counter for good reads
-        x = mean(record.letter_annotations["phred_quality"])
-        l = len(record)
-        sum_x += x
-        sum_x_sq += x**2
-        sum_l += l
-        sum_l_sq += l**2
+        #x = mean(record.letter_annotations["phred_quality"])
+        #l = len(record)
+        #sum_x += x
+        #sum_x_sq += x**2
+        #sum_l += l
+        #sum_l_sq += l**2
     else:
         count_bad += 1 #increment counter for bad reads
     if verbose:
@@ -148,10 +150,10 @@ if count == 0 :
 
 
 
-x_mean = sum_x/count #calculate the mean of mean quality score across a read
-x_std = sqrt((sum_x_sq/(count-1))-(x_mean**2)) #calculate the sample st. dev. of mean quality score
-l_mean = sum_l/count #calculate the mean length of reads
-l_std = sqrt((sum_l_sq/(count-1))-(l_mean**2)) #calculate the sample st. dev. of lengths
+#x_mean = sum_x/count #calculate the mean of mean quality score across a read
+#x_std = sqrt((sum_x_sq/(count-1))-(x_mean**2)) #calculate the sample st. dev. of mean quality score
+#l_mean = sum_l/count #calculate the mean length of reads
+#l_std = sqrt((sum_l_sq/(count-1))-(l_mean**2)) #calculate the sample st. dev. of lengths
 
 
 # Write log
@@ -161,8 +163,8 @@ logpath.write("Logfile for quality control filtering of " \
 "Parameters specified:\n" \
 "Minimum nucleotide quality score: " + str(minimum_score) + "\n" \
 "Window size to check for minimum score: " + str(win_size) + "\n" \
-"Lowest acceptable average read quality score " \
-+ "(after trimming bad bases): " + str(average_score) + "\n" \
+#"Lowest acceptable average read quality score " \
+#+ "(after trimming bad bases): " + str(average_score) + "\n" \
 "Nucleotides to trim from front of each read: " \
 + str(left_trimming) + "\n" \
 "Minimum sequence length: " + \
@@ -171,13 +173,13 @@ str(min_length) + "\n" \
 str(max_length) + "\n\n" \
 "Counts:\n" \
 "Total high quality reads written: " + str(count) + "\n" \
-"Total poor quality reads ignored: " + str(count_bad) + "\n"
-"Mean of mean QCed read quality: " + str(x_mean) + "\n" \
-"Standard deviation of mean QCed read quality: " + \
-str(x_std) + "\n" +\
-"Mean QCed read length: " + str(l_mean) + "\n" +\
-"Standard deviation of QCed read length: " + \
-str(l_std))
+"Total poor quality reads ignored: " + str(count_bad) + "\n")
+#"Mean of mean QCed read quality: " + str(x_mean) + "\n" \
+#"Standard deviation of mean QCed read quality: " + \
+#str(x_std) + "\n" +\
+#"Mean QCed read length: " + str(l_mean) + "\n" +\
+#"Standard deviation of QCed read length: " + \
+#str(l_std))
 logpath.close()
 
 print "Run finished " + strftime("%Y-%m-%d %H:%M:%S") + "."
