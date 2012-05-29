@@ -279,7 +279,7 @@ def identify_read(ptrie, rec, barcodes, ids, primers, bc_len=8, rpad=4, \
     except IndexError:
         return 0, "Unassigned", "Unknown", "Unknown", None, 0
 
-def getname(seqrecord, splitchar=split_on, partn=rn_part):
+def getname(seqrecord, splitchar, partn):
     '''Extracts the name of the read based on sequencing platform.
     
     A hash is used to reduce the size of the names stored in memory.
