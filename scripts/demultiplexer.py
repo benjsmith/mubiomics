@@ -143,7 +143,8 @@ except ValueError :
     if barcode_type == 'hamming_8' :
         barcode_length = 8
     else :
-        print "--barcode_type (-b) specified is an unsupported type"
+        print "--barcode_type (-b) " + str(barcode_type) + " is an unsupported type"
+        print "Run demultiplexer.py -h for help"
         sys.exit(1)
 max_bc_mismatch = args.max_barcode_errors[0]
 max_prim_mismatch = args.max_primer_mismatch[0] 
@@ -194,18 +195,6 @@ if not suppress:
     uahandle = open(str(os.path.splitext(outfile)[0]) + \
     ".unassigned." + outfmt, "wb") # unassigned output fasta file
 
-
-    
-def getname(seqrecord, splitchar=split_on, partn=rn_part):
-    '''Extracts the name of the read based on sequencing platform.
-    
-    '''
-    try:
-        name=seqrecord.description.split(splitchar)[partn]
-        #return name #used with radix trie method below
-        return hash(name)
-    except AttributeError:
-        return None
 
 
 if verbose :
@@ -280,7 +269,7 @@ line_ct = -1
 for line in maphandle :
     if line[0] != "#" :
         line_ct += 1
-        separated = line.split()
+        separated = line.split('\t')
         ids.append(separated[0])
         bcs[separated[1]] = line_ct
         try:
