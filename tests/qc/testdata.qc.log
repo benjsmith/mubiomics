@@ -1,0 +1,13 @@
+Logfile for quality control filtering of testdata.fastq
+2012-05-29 23:06:23
+
+Parameters specified:
+Minimum nucleotide quality score: 28
+Window size to check for minimum score: 10
+Nucleotides to trim from front of each read: 0
+Minimum sequence length: 80
+Maximum sequence length: None
+
+Counts:
+Total high quality reads written: 40277
+Total poor quality reads ignored: 109723

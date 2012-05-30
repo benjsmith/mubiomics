@@ -269,7 +269,8 @@ line_ct = -1
 for line in maphandle :
     if line[0] != "#" :
         line_ct += 1
-        separated = line.split('\t')
+        separated_raw = line.split('\t')
+        separated = [piece.rstrip() for piece in separated_raw]
         ids.append(separated[0])
         bcs[separated[1]] = line_ct
         try:
@@ -292,6 +293,7 @@ for line in maphandle :
             except IndexError:
                 pass
 #Test that mapping file yielded some data.
+
 try :
     ids[0]
 except IndexError:

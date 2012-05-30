@@ -3,7 +3,7 @@
 -oqc/testout.dmx.fasta
 -Ofasta
 -mtestmap.txt
--e1
+-e0
 -T3
 -R4
 -HHiSeq

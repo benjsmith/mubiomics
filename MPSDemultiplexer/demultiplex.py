@@ -265,8 +265,8 @@ def identify_read(ptrie, rec, barcodes, ids, primers, bc_len=8, rpad=4, \
             break
     try:
         best_pos = sorted(dist_dict.iteritems(), key=lambda (k,v): (v,k))[0][0]
-        #print "======"
-        #print "Min. primer dist = " + str(dist_dict[best_pos]) 
+#        print "======"
+#        print "Min. primer dist = " + str(dist_dict[best_pos]) 
         if dist_dict[best_pos] <= max_p_mismatch :
             # return best starting position in sequence, best ID, old barcode,
             #  new barcode, edit distance, and length of primer
