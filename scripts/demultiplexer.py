@@ -337,8 +337,8 @@ if paired:
 for i in range(0,nmax):
     if paired:
         # Determine which records to demultiplex.
-        name1=getname(seq1)
-        name2=getname(seq2)
+        name1=getname(seq1, split_on, rn_part)
+        name2=getname(seq2, split_on, rn_part)
         if name1==name2: # If current names are the same, then they are a pair.
             # Assign current seq1 to "record" to be identified.
             record = seq1
