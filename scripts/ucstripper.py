@@ -82,7 +82,8 @@ split_on = args.split_on[0]
 min_id = args.min_id[0]
 db_name_split=args.db_name_split[0]
 db_name_part=args.db_name_part
-db_name_part=[i-1 for i in db_name_part]
+if db_name_part!="All":
+    db_name_part=[i-1 for i in db_name_part]
 noise = args.noise
 verbose = args.verbose
 
