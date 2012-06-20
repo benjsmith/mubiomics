@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#seq_parser.py
+#seqparser.py
 #Provides various sequence manipulation tools.
 #    Copyright (C) <2012>  <Benjamin C. Smith>
 #

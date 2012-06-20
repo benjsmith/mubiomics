@@ -44,6 +44,27 @@ parser.add_argument('-s', '--split_on', nargs=1, default=['_'], type=str,
                     help='''set the chracter to split the sample name on. E.g.,
                     if the read name is sample1_00001 and the split is set to
                     "_", the sample name will be read as "sample1".''')
+parser.add_argument('-M', '--min_id', nargs=1, default=[97.0], type=float,
+                    help='''set minimum acceptable percent identity for a hit to
+                    to be accepted.''')
+parser.add_argument('-S', '--db_name_split', required=True, nargs=1,
+                    default=["|"],
+                    help='''set the separator character for reference sequence names.
+                    This can be used for selecting only a part of the name of the
+                    matched reference sequences as the taxon name.
+                    E.g. If the name of a sequence is
+                    "44919 Neisseria meningitidis str. M1976 AF310437.1 1..1471"
+                    and you just wanted "Neisseria meningitidis", you could
+                    set -S " " -P 2 3 (see notes for -P, below). If setting
+                    -P "All" to take the whole name then you can ignore this
+                    parameter.''')
+parser.add_argument('-P', '--db_name_part', required=True, nargs='+',
+                    default=["All"], type=int,
+                    help='''set the part or parts to select from the
+                    reference sequence name (see notes for -S, above). To
+                    select all parts set -P "All". To select a range of parts
+                    list the part numbers, separated by spaces. E.g., -P 1 2 3 to
+                    select the 1st, 2nd and 3rd parts (numbering starts at 1).''')
 parser.add_argument('-n', '--noise', action='store_true',
                     help='''condense counts for all clusters that do not match
                     any database sequences into a group called "Noise".''')
@@ -58,6 +79,10 @@ outfile = args.output_fp[0]
 # tab-delimited meta-data file
 mapfile = args.map_fp[0]
 split_on = args.split_on[0]
+min_id = args.min_id[0]
+db_name_split=args.db_name_split[0]
+db_name_part=args.db_name_part
+db_name_part=[i-1 for i in db_name_part]
 noise = args.noise
 verbose = args.verbose
 
@@ -94,38 +119,44 @@ otu_indices = [] #list to fill with tuples containing position to record
 #sample id
 for i, line in enumerate(handle1) :
     #if read is hit or new seed
-    if line[0] == "H" or line[0] =="S" :
+    if line[0] == "H" or line[0] =="S":
         if verbose :#print line number to stdout
             sys.stdout.write(str(i))
             sys.stdout.flush()
             sys.stdout.write("\b"*len(str(i)))
         separated = line.split("\t")
-        #get sample name
-        id = separated[8].split(str(split_on))
-        #build list of species' IDs
-        if separated[1] not in otus :
-            otus.append(separated[1])
-        #build list of species' names
-        #if hit, take last column as taxon name. split("/") used in case
-        #matching record contains original sequence name, then the part
-        #containing the read direction identifier and all after will be stripped
-        if line[0] == "H":
-            if separated[9].rstrip("\n").split("/")[0] not in taxon_names :
-                taxon_names.append(separated[9].rstrip("\n").split("/")[0])
-        #if new seed, take penultimate column as taxon name
-        elif line[0] == "S":
-            if separated[8].split("/")[0] not in taxon_names :
-                taxon_names.append(separated[8].split("/")[0])
-        #create tuples of indices of OTU ID and corresponding sample name 
-        otu_indices.append([otus.index(separated[1])+1, \
-        sample_ids.index(id[0])])
-    #if read used as new seed
+        if separated[3]>min_id:
+            #get sample name
+            id = separated[8].split(str(split_on))
+            #build list of species' IDs
+            if separated[1] not in otus :
+                otus.append(separated[1])
+            #build list of species' names
+            #if hit, take last column as taxon name. split("/") used in case
+            #matching record contains original sequence name, then the part
+            #containing the read direction identifier and all after will be stripped   
+            if line[0] == "H":
+                matchcolumn=9
+            #if new seed, take penultimate column as taxon name
+            elif line[0] == "S":
+                matchcolumn=8
+            taxname=separated[matchcolumn].rstrip("\n")
+            if taxname.split(str(split_on))[0] not in sample_ids:
+                if db_name_part=="All":
+                    pass
+                else:
+                    taxname=' '.join([taxname.split(str(db_name_split))[i] \
+                    for i in db_name_part])
+            if taxname not in taxon_names :
+                    taxon_names.append(taxname)
+            #create tuples of indices of OTU ID and corresponding sample name 
+            otu_indices.append([taxon_names.index(taxname)+1, \
+            sample_ids.index(id[0])])
         
 
 
 if verbose:
     print "Generating OTU table from hit counts..."
-    
 #count all pairs of samples and OTUs
 otu_table = zeros( (len(otus)+1, len(sample_ids)), dtype=object )
 for index in otu_indices :
