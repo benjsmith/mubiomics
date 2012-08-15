@@ -244,14 +244,17 @@ if paired:
         except KeyError:
             readnames[getname(seq, split_on, rn_part)]=[None, i]
     nmax=len(readnames)
+    iter_range = range(0,nmax)
     firstiter = SeqIO.parse(infile, infmt)#reload as exhausted by list comp.
     mateiter = SeqIO.parse(pairfile, infmt)#reload as exhausted by list comp.
     if verbose:
         print "Built " + strftime("%Y-%m-%d %H:%M:%S") + "."
         print str(nmax) + " mated and singleton reads to process."
 else:
+    if verbose:
+        print "Counting reads in input file..."
     #get number of reads to process
-    nmax=len([seq for seq in firstiter])
+    iter_range=firstiter
     #reinitialize generator (it will have been consumed in previous step)
     firstiter=SeqIO.parse(infile, infmt)
         
@@ -328,6 +331,7 @@ count_pm = 0
 #count_norev = assigned reverse reads where no reverse primer was found when
 #one had been specified in the maping file. May indicate a chimeric sequence.
 count_norev = 0
+i=0
 
 if verbose:
     print "Demultiplexing..."
@@ -336,7 +340,8 @@ seq1 = firstiter.next()
 if paired:
     seq2 = mateiter.next()
 # Run identification loop.
-for i in range(0,nmax):
+for s in iter_range:
+    i+=1
     if paired:
         # Determine which records to demultiplex.
         name1=getname(seq1, split_on, rn_part)

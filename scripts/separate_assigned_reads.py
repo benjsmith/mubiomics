@@ -26,7 +26,9 @@
             
 from Bio import SeqIO
 from collections import deque
-import sys, os, argparse
+import sys, os, argparse, resource
+
+#resource.setrlimit(resource.RLIMIT_NOFILE, (2048,-1))
 
 parser = argparse.ArgumentParser(
     description='''Split a fasta file containing reads from multiple samples

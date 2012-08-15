@@ -99,6 +99,8 @@ for rec in record_iter:
 
 handle1.close()
 handle2.close()
-if qualhandle:
+try:
     qualhandle.close()
+except NameError:
+    pass
 print "Conversion finished."
