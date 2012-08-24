@@ -33,10 +33,12 @@ parser.add_argument('-i','--infile', required=True, nargs=1,
 parser.add_argument('-o', '--outfile', required=True, nargs=1, type=str,
 		    help='''output filepath. The resulting pooled OTU table is
 		    written here.''')
-parser.add_argument('-k', '--keep', nargs=1, default=[100], type=float,
-		    help='''set the percentile of matched taxa to keep. E.g., setting
-			95 will keep the top 95th percentile of taxa, based on number of
-			reads assigned to each taxon. In microbial communities,
+parser.add_argument('-k', '--keep', nargs=1, default=[0], type=float,
+			help='''set the minimum percentile of matched taxa to keep
+			based on maximum reads per sample for each taxon.
+			E.g., setting 50 will keep the taxon with a maximum number of
+			reads per sample that represents the 50th
+			percentile and all taxa above. In microbial communities,
 			there is usually a high degree of taxon uneveness and their
 			distribution may have a long tail. For this reason, you may be
 			required to set this value much higher than you would normally
@@ -44,10 +46,10 @@ parser.add_argument('-k', '--keep', nargs=1, default=[100], type=float,
 parser.add_argument('-r', '--reads', action='store_true', 
                     help='''print information about number of reads''')
 args = parser.parse_args()
-min_cts = 100 - args.keep[0]
-if min_cts > 100 or min_cts < 0:
-    print "Invalid minimum count threshold (-k/--keep) set. \
-Must be in range [0, 100]."
+min_cts = args.keep[0]
+if min_cts >= 100 or min_cts < 0:
+    print "Invalid minimum count threshold (-k/--keep parameter). \
+Value must be >= 0 and < 100 ."
     sys.exit(1)
 infile = args.infile[0]
 outfile = args.outfile[0]
@@ -55,20 +57,22 @@ outfile = args.outfile[0]
 
 print "\nRun started " + strftime("%Y-%m-%d %H:%M:%S") + "."
 
-inhandle = csv.reader(open(infile, 'rU'), delimiter='\t')
-outhandle = csv.writer(open(outfile, 'wb'), delimiter='\t')
-#Write header lines of output file.
-outhandle.writerow([''.join(inhandle.next()) + ', pooled'])
-outhandle.writerow(inhandle.next())
+
 
 #collect sample names, using first line of file
 inhandle = csv.reader(open(infile, 'rU'), delimiter='\t')
-inhandle.next()
-sample_ids = [column for column in inhandle.next() if \
-re.search(column, "#OTU ID"'|'"Consensus Lineage")==None]
+outhandle = csv.writer(open(outfile, 'wb'), delimiter='\t')
+for line in inhandle:
+	if line[0][0] == "#":
+		if line[0]=="#OTU ID":
+			sample_ids = [column for column in line if \
+			re.search(column, "#OTU ID"'|'"Consensus Lineage")==None]
+		outhandle.writerow(line)
+	else:
+		break
+
 otu_names = []
 otu_dict = {}
-
 #build list of OTU names
 inhandle = csv.reader(open(infile, 'rU'), delimiter='\t')
 for line in inhandle :
@@ -82,18 +86,20 @@ for line in inhandle :
 		    otu_dict[line[-1]].append(line[1:-1])
 
 
-#otu_table=[[i,array(otu_dict[key], dtype=int).sum(axis=0)]]
-#create array of total counts per sample by summing along columns
-total_counts_per_otu=array([array(lists, dtype=int).sum(axis=0) for lists in
-							otu_dict.values()]).sum(axis=1)
+
+#create array of total counts per sample per otu by summing columns for all lists of
+#counts for each otu
+counts_per_otu=array([array(lists, dtype=int).sum(axis=0) for lists in
+							otu_dict.values()])
 #Calculate the total reads in the table prior to filtering
-tot_start_cts = sum(total_counts_per_otu)
-#Order the taxa according to its number of counts
-ordered_taxa=sorted([(name, number) for name, number in
-	zip(otu_dict.keys(), total_counts_per_otu)],
+tot_start_cts = counts_per_otu.sum()
+#Order the taxa according to maximum number of counts in a sample
+ordered_taxa=sorted([(name, max(counts)) for name, counts in
+	zip(otu_dict.keys(), counts_per_otu)],
 	key=lambda taxon: taxon[1])
 #Calculate the rank above which to keep taxa based on the specified percentile.
-keep_rank=int(round((min_cts/100)*len(ordered_taxa)+0.5))
+#Subtract 1 because python list numbering starts at 0.
+keep_rank=int(round((min_cts/100)*len(ordered_taxa)+0.5))-1
 
 
 otu_table = [] #empty array that will be filled with filtered count data
@@ -102,7 +108,7 @@ ictr = 1 #counter for assigning new OTU IDs.
 tot_end_cts = 0
 for i, entry in enumerate(ordered_taxa):
 	key=entry[0]
-	if i > keep_rank and entry[1]>0:
+	if i >= keep_rank and entry[1]>0:
 		#create row for output 
 		if key != 'Noise' : #if not the "Noise" OTU add otu_id from ictr
 			# and increment it by 1.
@@ -134,15 +140,18 @@ logpath.write("Logfile for OTU pooling of " \
 "Counts:"
 "\nTotal reads in input OTU table: " + str(tot_start_cts) + "\n" \
 "Total reads in output OTU table: " + str(tot_end_cts) + "\n" \
-"Reads discarded through retaining top " + str(100-min_cts) \
-    + " percentile: " + str(tot_start_cts-tot_end_cts) + "\n")
+"Reads discarded through retaining " + str(min_cts) \
+    + " percentile and above: " + str(tot_start_cts-tot_end_cts) + "\n" \
+"Maximum reads per sample of " + str(min_cts) + " percentile: " + str(ordered_taxa[keep_rank][1]) + "\n" )
 logpath.close()
 
 print "\n\nLog file written (" + str(os.path.splitext(outfile)[0]) + ".log" + ")\n"
 
 if args.reads:
-    print '\nTotal reads in input OTU table: ' + str(tot_start_cts)
-    print 'Total reads in output OTU table: ' + str(tot_end_cts)
-    print 'Reads discarded through retaining top ' + str(100-min_cts) \
-    + ' percentile: ' + str(tot_start_cts-tot_end_cts) + '\n'
+	print '\nTotal reads in input OTU table: ' + str(tot_start_cts)
+	print 'Total reads in output OTU table: ' + str(tot_end_cts)
+	print 'Reads discarded through retaining' + str(min_cts) \
+	+ ' percentile and above: ' + str(tot_start_cts-tot_end_cts)
+	print 'Maximum reads per sample of ' + str(min_cts) + ' percentile: ' \
+	+ str(ordered_taxa[keep_rank][1]) + "\n" 
 
