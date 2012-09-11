@@ -336,9 +336,17 @@ i=0
 if verbose:
     print "Demultiplexing..."
 # Beginning of run, if so, get first two position values.
-seq1 = firstiter.next()
+try:
+    seq1 = firstiter.next()
+except StopIteration:
+    print "Error in input (-i) file. Please check and run again."
+    sys.exit(2)
 if paired:
-    seq2 = mateiter.next()
+    try:
+        seq2 = mateiter.next()
+    except StopIteration:
+        print "Error in mate (-m) file. Please check and try again."
+        sys.exit(3)
 # Run identification loop.
 for s in iter_range:
     i+=1
