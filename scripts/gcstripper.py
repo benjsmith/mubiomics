@@ -42,7 +42,10 @@ parser.add_argument('-o', '--outpath', nargs='?', type=str,
 parser.add_argument('-r', '--rank', nargs=1, type=str, default=['genus'],
                     help='''specify taxonomic rank at which to extract counts.
                     Acceptable arguments are "superkingdom", "phylum", "class",
-                    "subclass", "order", "family", "genus" and "species".''')
+                    "subclass", "order", "family", "genus", "species" or "otu".
+                    The latter gives the deepest taxonomic classification
+                    that has a maximum likelihood greater than the minimum
+                    threshold (-c/--conf).''')
 parser.add_argument('-c', '--conf', nargs=1, default=[0.8], type=float,
                     help='''set minimum acceptable maximum likelihood value for
                     an assignment to be counted.''')
@@ -78,7 +81,8 @@ inhandle = csv.reader(open(infile, "rU"), delimiter=',')#input file handle
 outhandle = csv.writer(open(outpath, "wb"), dialect='excel', delimiter='\t')# output file handle
 
 tax_ranks = ["root", "below_root", "superkingdon", "phylum", "class", "subclass"
-            , "order", "family", "genus", "species"] 
+            , "order", "family", "genus", "species"]
+len_tr = len(tax_ranks)
 
 inhandle.next()#skip first row of input file containing headers
 #generate dictionary with keys = sample names, values = list of otus in sample
@@ -114,23 +118,40 @@ for j, row in enumerate(inhandle) :
         #case of unclassified sequences in the reference database
         except KeyError:
             #in case it is an unclassified case, seek the lowest level of
-            #classification that is lower than the desired one.
+            #classification possible.
             try:
-                #set counter equal to 1 + position of desired rank in "tax_ranks"
-                i = 1 + tax_ranks.index(rank)
-                #iterate until get to the end of "tax_ranks" or find a
-                #classification
-                while i < len(tax_ranks):
+                #set counter equal to last position in tax_ranks
+                if rank=="otu":
+                    i = len_tr-1
+                    #iterate until get to the shallowest classifcation level
+                    while i >= 0:
                     #attempt to pull the classification at the level given by i.
                     #If a match is found at that level, return it, indicating
                     #that it is not at the desired rank.
-                    try:
-                        result = ''.join([classification[tax_ranks[i]],
-": no ", rank, " data"])
-                        break
-                    #if still no match at that level, increment counter
-                    except KeyError:
-                        i += 1             
+                        try:
+                            result = ''.join([classification[tax_ranks[i]],
+" (", tax_ranks[i], ")"])
+                            break
+                        #if still no match at that level, decrement counter
+                        except KeyError:
+                            i -= 1
+                else:
+                    #set counter equal to 1 + position of desired rank in "tax_ranks"
+                    i = 1+tax_ranks.index(rank)
+                    #iterate until get to the end of "tax_ranks" or find a
+                    #classification
+                    while i < len_tr:
+                        #attempt to pull the classification at the level given by i.
+                        #If a match is found at that level, return it, indicating
+                        #that it is not at the desired rank.
+                        try:
+                            result = ''.join([classification[tax_ranks[i]],
+" (", tax_ranks[i],")"])
+                            break
+                        #if still no match at that level, increment counter
+                        except KeyError:
+                            i += 1
+                             
             #if could not set i based on desired rank, it means the desired rank
             #is not in the list of understood ranks ("tax_ranks").
             except ValueError:
@@ -149,7 +170,8 @@ see help documentation."
         #dictionary
         current = read
         classification = {}
-        classification[tax_level] = tax_name
+        if likelihood > conf:
+            classification[tax_level] = tax_name
 
 
 #generate list of sample ids and
@@ -182,7 +204,7 @@ otu_ids = array([[i] for i in otu_ids])
 pre_table = vstack((sample_ids, count_matrix))
 final_table = hstack((otu_ids, pre_table, otus))
 
-outhandle.writerow(["#guppy classify OTU table"])
+outhandle.writerow([''.join(["#guppy classify ", rank, " table"])])
 for row in final_table:
     outhandle.writerow(row)
             
